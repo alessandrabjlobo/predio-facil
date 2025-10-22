@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "lib": ["dom", "deno.ns"],
+    "strict": true
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "exclude": ["no-import-prefix"]
+    }
+  }
+}
