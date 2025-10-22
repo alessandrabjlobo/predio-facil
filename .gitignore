@@ -32,3 +32,10 @@ core
 
 .github/
 
+
+# === secrets ===
+.env
+.env.*
+*.env
+supabase/functions/.env
+
