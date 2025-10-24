@@ -49,7 +49,7 @@ export type ConfTipo =
 export type Semaforo = "verde" | "amarelo" | "vermelho";
 
 /** ações do log de conformidade */
-export type ConfAcao = "resolver" | "remarcar" | "anexar";
+export type ConfAcao = "criacao" | "edicao" | "exclusao" | "validacao" | "anexar" | "resolver" | "remarcar";
 
 /* ===========================
  * Helpers
@@ -299,10 +299,16 @@ export async function listAtivos() {
   try {
     const { data, error } = await supabase
       .from("ativos")
-      .select("*")
+      .select(`
+        *,
+        ativo_tipos!ativos_tipo_id_fkey(nome, slug)
+      `)
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map((a: any) => ({
+      ...a,
+      tipo: a.ativo_tipos?.nome ?? a.tipo ?? "Outros",
+    }));
   } catch (_e) {
     const { data: d2, error: e2 } = await supabase.from("ativos").select("*");
     if (e2) throw e2;
@@ -819,14 +825,17 @@ export async function logConformidadeAcao(
   detalhes?: any
 ) {
   const perfil = await getOrCreatePerfil();
+  const acaoValida: "criacao" | "edicao" | "exclusao" | "validacao" = 
+    (acao === "anexar" || acao === "resolver" || acao === "remarcar") ? "edicao" : acao as any;
+  
   const { data, error } = await supabase
     .from("conformidade_logs")
-    .insert({
+    .insert([{
       item_id,
       usuario_id: perfil.id,
-      acao,
+      acao: acaoValida,
       detalhes: detalhes ?? {},
-    })
+    }])
     .select()
     .single();
   if (error) throw error;
@@ -854,15 +863,17 @@ export async function registrarExecucaoConformidade(
 ) {
   const { data, error } = await supabase.rpc("conf_registrar_execucao", {
     p_item_id: itemId,
-    p_ultimo: dataISO ?? new Date().toISOString().slice(0, 10),
+    p_data_execucao: dataISO ?? new Date().toISOString().slice(0, 10),
   });
   if (error) throw error;
   return data;
 }
 
-export async function adiarProximoConformidade(itemId: string) {
+export async function adiarProximoConformidade(itemId: string, novaData: string, motivo?: string) {
   const { data, error } = await supabase.rpc("conf_adiar_proximo", {
     p_item_id: itemId,
+    p_nova_data: novaData,
+    p_motivo: motivo ?? null,
   });
   if (error) throw error;
   return data;
@@ -1134,12 +1145,12 @@ export async function upsertCondoConfig(patch: Partial<CondoConfig>) {
   if (!current) {
     const { data, error } = await supabase
       .from("condominio_config")
-      .insert({
+      .insert([{
         nome: patch.nome ?? null,
         unidades: patch.unidades ?? null,
         endereco: patch.endereco ?? null,
         updated_at: new Date().toISOString(),
-      })
+      }] as any)
       .select()
       .single();
     if (error) throw error;
@@ -1228,7 +1239,10 @@ export async function listAtivoTipos(): Promise<AtivoTipoRow[]> {
     .select("*")
     .order("nome", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(d => ({
+    ...d,
+    conf_tipo: (d.conf_tipo as any) ?? null,
+  })) as AtivoTipoRow[];
 }
 
 export async function createAtivoTipo(payload: {

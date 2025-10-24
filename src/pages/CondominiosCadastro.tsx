@@ -32,16 +32,17 @@ export default function CondominiosCadastroPage() {
         return;
       }
 
-      const { data: row, error: rowErr } = await supabase
-        .from("system_admins")
-        .select("auth_user_id")
-        .eq("auth_user_id", user.id)
+      // Fallback: usar user_roles
+      const { data: userRoles, error: rolesErr } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", (await supabase.from("usuarios").select("id").eq("auth_user_id", user.id).maybeSingle()).data?.id ?? "")
         .maybeSingle();
 
-      if (rowErr) {
-        setIsOwner(true);
+      if (rolesErr) {
+        setIsOwner(false);
       } else {
-        setIsOwner(!!row);
+        setIsOwner(userRoles?.role === "admin");
       }
     })();
   }, []);

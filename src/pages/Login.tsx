@@ -29,7 +29,29 @@ export default function Login() {
       });
       if (error) throw error;
 
-      const perfil = await getOrCreatePerfil();
+      await getOrCreatePerfil();
+
+      // Obter papel do usuário a partir de usuarios_condominios
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não encontrado");
+
+      const { data: usuario } = await supabase
+        .from("usuarios")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+
+      let papelUsuario: Papel | null = null;
+      if (usuario?.id) {
+        const { data: relacao } = await supabase
+          .from("usuarios_condominios")
+          .select("papel")
+          .eq("usuario_id", usuario.id)
+          .eq("is_principal", true)
+          .maybeSingle();
+        
+        papelUsuario = (relacao?.papel as Papel) ?? null;
+      }
 
       // 🔽 Redireciona SEM considerar 'from', baseado no papel
       const destinoPorPapel: Record<Papel, string> = {
@@ -41,7 +63,7 @@ export default function Login() {
         morador: "/",
         conselho: "/",
       };
-      const destino = destinoPorPapel[perfil.papel] ?? "/";
+      const destino = papelUsuario ? (destinoPorPapel[papelUsuario] ?? "/") : "/";
 
       nav(destino, { replace: true });
     } catch (err: any) {

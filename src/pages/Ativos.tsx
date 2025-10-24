@@ -68,7 +68,7 @@ type Plano = {
   ativo_id: string | null;
   titulo: string;
   tipo: "preventiva" | "preditiva" | "corretiva";
-  periodicidade: string;
+  periodicidade: any;
   proxima_execucao: string;
   checklist?: any;
   responsavel?: string;
@@ -80,7 +80,7 @@ type Manutencao = {
   plano_id?: string | null;
   titulo: string;
   tipo: string;
-  status: "pendente" | "agendada" | "executando" | "concluida" | "cancelada";
+  status: "pendente" | "em_execucao" | "concluida" | "cancelada";
   vencimento?: string | null;
   executada_em?: string | null;
   anexo_path?: string | null;
