@@ -4,7 +4,7 @@
     "module": "ESNext",
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["vite/client", "node"],
     "paths": {
       "@/*": ["./src/*"]
