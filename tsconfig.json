@@ -5,8 +5,9 @@
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
     "types": ["vite/client"],
-    "baseUrl": ".",                 // se você usa "@/..." mantenha por enquanto
-    "paths": { "@/*": ["src/*"] },  // mapeia "@/..." -> "src/..."
-    "ignoreDeprecations": "6.0"     // <<< silencia o aviso do baseUrl
+   "paths": { 
+  "@/*": ["./src/*"]
+}
+
   }
 }
