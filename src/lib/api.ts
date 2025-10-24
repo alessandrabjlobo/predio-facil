@@ -5,7 +5,9 @@
  * =========================== */
 export type Papel =
   | "sindico"
+  | "admin"
   | "funcionario"
+  | "zelador"
   | "morador"
   | "fornecedor"
   | "conselho";

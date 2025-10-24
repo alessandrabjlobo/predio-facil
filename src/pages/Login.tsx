@@ -34,9 +34,12 @@ export default function Login() {
       // 🔽 Redireciona SEM considerar 'from', baseado no papel
       const destinoPorPapel: Record<Papel, string> = {
         sindico: "/",
+        admin: "/",
         funcionario: "/funcionario",
+        zelador: "/funcionario",
         fornecedor: "/fornecedor",
         morador: "/",
+        conselho: "/",
       };
       const destino = destinoPorPapel[perfil.papel] ?? "/";
 
