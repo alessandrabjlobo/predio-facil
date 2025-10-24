@@ -9,9 +9,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [dyadComponentTagger(), react()],
     resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "src"),
-      },
+      alias: [
+        { find: "@/integrations/supabase/client", replacement: path.resolve(__dirname, "src/supabase-client-alias.ts") },
+        { find: "@", replacement: path.resolve(__dirname, "src") },
+      ],
     },
     server: {
       port: 8080,
