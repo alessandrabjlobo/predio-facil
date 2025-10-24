@@ -22,6 +22,7 @@ import SignUp from "@/pages/SignUp";
 import Conformidade from "@/pages/Conformidade";
 import ConfiguracoesPage from "@/pages/Configuracoes";
 import Preventivas from "@/pages/Preventivas";
+import DashboardAdmin from "@/pages/DashboardAdmin";
 
 // Ordens de Serviço
 import OS from "@/pages/OS";
@@ -70,26 +71,37 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* Index: se for owner, manda para /owner; senão mostra o Dashboard normal */}
+          {/* Index: roteamento inteligente baseado no papel */}
           <Route index element={<TenantIndex />} />
 
-          {/* Papéis / perfis */}
-          <Route
-            path="funcionario"
-            element={
-              <RequireRole allowed={["sindico", "funcionario"]}>
-                <DashboardFuncionario />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="fornecedor"
-            element={
-              <RequireRole allowed={["sindico", "fornecedor"]}>
-                <DashboardFornecedor />
-              </RequireRole>
-            }
-          />
+          {/* Dashboards específicos por papel */}
+          <Route path="dashboard">
+            <Route path="sindico" element={<Dashboard />} />
+            <Route 
+              path="admin" 
+              element={
+                <RequireRole allowed={["admin", "sindico"]}>
+                  <DashboardAdmin />
+                </RequireRole>
+              } 
+            />
+            <Route 
+              path="funcionario" 
+              element={
+                <RequireRole allowed={["funcionario", "zelador", "sindico", "admin"]}>
+                  <DashboardFuncionario />
+                </RequireRole>
+              } 
+            />
+            <Route 
+              path="fornecedor" 
+              element={
+                <RequireRole allowed={["fornecedor", "sindico", "admin"]}>
+                  <DashboardFornecedor />
+                </RequireRole>
+              } 
+            />
+          </Route>
 
           {/* Módulos principais */}
           <Route path="agenda" element={<Agenda />} />

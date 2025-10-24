@@ -1,21 +1,33 @@
-// src/pages/TenantIndex.tsx
-import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import Dashboard from "@/pages/Dashboard";
-import { supabase } from "@/lib/supabaseClient";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export default function TenantIndex() {
-  const [isOwner, setIsOwner] = useState<null | boolean>(null);
+  const { role, loading } = useUserRole();
 
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase.rpc("is_system_owner");
-      setIsOwner(!error && !!data);
-    })();
-  }, []);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (isOwner === null) return <div className="p-6">Carregando…</div>;
-  if (isOwner) return <Navigate to="/owner" replace />;
-
-  return <Dashboard />;
+  switch (role) {
+    case "owner":
+      return <Navigate to="/owner" replace />;
+    case "sindico":
+      return <Navigate to="/dashboard/sindico" replace />;
+    case "admin":
+      return <Navigate to="/dashboard/admin" replace />;
+    case "funcionario":
+    case "zelador":
+      return <Navigate to="/dashboard/funcionario" replace />;
+    case "fornecedor":
+      return <Navigate to="/dashboard/fornecedor" replace />;
+    default:
+      return <Navigate to="/dashboard/sindico" replace />;
+  }
 }
