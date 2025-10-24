@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, ClipboardList, DollarSign, TrendingUp } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 
 export default function DashboardFornecedor() {

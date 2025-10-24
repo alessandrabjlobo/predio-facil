@@ -1,7 +1,7 @@
 // src/pages/Chamados.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { listChamados, updateChamado } from "@/lib/api";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";

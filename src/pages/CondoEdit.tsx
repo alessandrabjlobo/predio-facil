@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import RequireOwner from "@/components/RequireOwner";
 
 type Condo = { id: string; nome: string; endereco: string | null; created_at: string };

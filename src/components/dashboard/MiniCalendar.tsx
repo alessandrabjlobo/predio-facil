@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { ymd, addDays, firstDayOfMonth, lastDayOfMonth, startOfWeekMon } from "@/lib/date";
 
 type AgendaEvent = {
@@ -34,14 +34,28 @@ export default function MiniCalendar({ onOpenAgenda }: Props) {
     (async () => {
       setLoading(true);
       setErr(null);
+      // Agenda events é uma view - usar calendario_manutencoes como fallback
       const { data, error } = await supabase
-        .from("agenda_events")
+        .from("calendario_manutencoes")
         .select("*")
-        .gte("start_date", ymd(monthStart))
-        .lte("start_date", ymd(monthEnd))
-        .order("start_date", { ascending: true });
+        .gte("data_evento", ymd(monthStart))
+        .lte("data_evento", ymd(monthEnd))
+        .order("data_evento", { ascending: true });
       if (error) setErr(error.message);
-      setEvents((data as AgendaEvent[]) || []);
+      
+      // Mapear para AgendaEvent
+      const mapped = (data || []).map((d: any) => ({
+        id: d.id ?? '',
+        evento_tipo: 'manutencao' as const,
+        titulo: d.titulo ?? '',
+        start_date: d.data_evento ?? '',
+        end_date: null,
+        status: d.status_visual ?? '',
+        ativo_id: d.ativo_id,
+        conformidade_item_id: null,
+      }));
+      
+      setEvents(mapped);
       setLoading(false);
     })();
   }, [cursor]);

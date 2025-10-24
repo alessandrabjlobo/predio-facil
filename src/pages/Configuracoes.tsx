@@ -24,7 +24,7 @@ import {
   CondoConfig,
   ManutTemplate,
 } from "@/lib/api";
-import { supabase } from "@/lib/supabaseClient"; // ⬅️ para CRUD de conf_categorias
+import { supabase } from "@/integrations/supabase/client"; // ⬅️ para CRUD de conf_categorias
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

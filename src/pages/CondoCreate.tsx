@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import RequireOwner from "@/components/RequireOwner";
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null; magic?: string | null };

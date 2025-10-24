@@ -1,6 +1,6 @@
 // src/pages/Owner.tsx
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null };
 type Condo = { id: string; nome: string; endereco: string | null; created_at: string };
@@ -21,20 +21,30 @@ export default function OwnerPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setIsOwner(false); return; }
 
-      // 1) tenta RPC (versão sem parâmetro que usa auth.uid() no SQL)
+      // tenta RPC (versão sem parâmetro que usa auth.uid() no SQL)
       const { data: rpc, error: rpcErr } = await supabase.rpc("is_system_owner");
       if (!rpcErr) {
         setIsOwner(!!rpc);
         return;
       }
-      // 2) fallback: checa na tabela
-      const { data: row, error } = await supabase
-        .from("system_admins")
-        .select("auth_user_id")
+      
+      // fallback: checa user_roles
+      const { data: usuario } = await supabase
+        .from("usuarios")
+        .select("id")
         .eq("auth_user_id", user.id)
         .maybeSingle();
-
-      setIsOwner(error ? false : !!row);
+        
+      if (usuario?.id) {
+        const { data: userRole } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", usuario.id)
+          .maybeSingle();
+        setIsOwner(userRole?.role === 'admin');
+      } else {
+        setIsOwner(false);
+      }
     })();
   }, []);
 

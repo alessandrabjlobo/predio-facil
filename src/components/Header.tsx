@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
 import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 

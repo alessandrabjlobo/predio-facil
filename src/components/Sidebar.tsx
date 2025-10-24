@@ -20,7 +20,7 @@ import {
   Briefcase,
   type LucideIcon,
 } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 
 type NavItem = { name: string; href: string; icon: LucideIcon };

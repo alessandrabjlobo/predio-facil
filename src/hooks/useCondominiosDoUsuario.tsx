@@ -1,6 +1,6 @@
 // src/hooks/useCondominiosDoUsuario.tsx
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 type Row = {
   condominio_id: string;

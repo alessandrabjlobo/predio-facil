@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { CalendarDays, CheckCircle2, FileDown, Loader2, RefreshCcw } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ======================= Tipos ======================= */
 export type AgendaEvent = {
@@ -33,13 +33,26 @@ export type AgendaEvent = {
 
 /* ======================= API helpers ======================= */
 async function listAgendaEvents(fromISO?: string, toISO?: string): Promise<AgendaEvent[]> {
-  let q = supabase.from("agenda_events").select("*");
-  if (fromISO) q = q.gte("start_date", fromISO);
-  if (toISO) q = q.lte("start_date", toISO);
-  q = q.order("start_date", { ascending: true });
+  let q = supabase.from("calendario_manutencoes").select("*");
+  if (fromISO) q = q.gte("data_evento", fromISO);
+  if (toISO) q = q.lte("data_evento", toISO);
+  q = q.order("data_evento", { ascending: true });
   const { data, error } = await q;
   if (error) throw error;
-  return (data as AgendaEvent[]) ?? [];
+  
+  // Mapear para AgendaEvent
+  const mapped = (data || []).map((d: any) => ({
+    id: d.id ?? '',
+    evento_tipo: 'manutencao' as const,
+    titulo: d.titulo ?? '',
+    start_date: d.data_evento ?? '',
+    end_date: null,
+    status: d.status_visual ?? '',
+    ativo_id: d.ativo_id,
+    conformidade_item_id: null,
+  }));
+  
+  return mapped;
 }
 
 async function updateEventDate(ev: AgendaEvent, newDateISO: string) {
@@ -68,13 +81,13 @@ async function quickConclude(ev: AgendaEvent) {
     if (eFetch) throw eFetch;
 
     const base = item?.proximo ?? new Date().toISOString().slice(0, 10);
+    // Calcular próximo manualmente
     let nextDate: string | null = null;
     try {
-      const { data: calc }: any = await supabase.rpc("calc_next_date_from_interval", {
-        base_date: base,
-        interval_value: item?.periodicidade ?? null,
-      });
-      if (calc && calc.next_date) nextDate = calc.next_date as string;
+      const d = new Date(base);
+      const periodoDias = 30; // padrão mensal, ajustar conforme necessário
+      d.setDate(d.getDate() + periodoDias);
+      nextDate = d.toISOString().slice(0, 10);
     } catch {
       const d = new Date(base);
       d.setDate(d.getDate() + 30);
