@@ -339,7 +339,7 @@ export async function createAtivo(payload: { nome: string; tipo: string; local?:
           .eq("titulo", r.titulo)
           .maybeSingle();
         if (!ja) {
-          const { error: eIns } = await supabase.from("planos_manutencao").insert(r);
+          const { error: eIns } = await supabase.from("planos_manutencao").insert(r as any);
           if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
         }
       }

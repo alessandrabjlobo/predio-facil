@@ -280,6 +280,44 @@ export type Database = {
           },
         ]
       }
+      condominio_config: {
+        Row: {
+          condominio_id: string
+          created_at: string
+          endereco: string | null
+          id: string
+          nome: string
+          unidades: number | null
+          updated_at: string
+        }
+        Insert: {
+          condominio_id: string
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          nome: string
+          unidades?: number | null
+          updated_at?: string
+        }
+        Update: {
+          condominio_id?: string
+          created_at?: string
+          endereco?: string | null
+          id?: string
+          nome?: string
+          unidades?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "condominio_config_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: true
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       condominio_template_overrides: {
         Row: {
           checklist_adicional: Json | null
@@ -1358,6 +1396,18 @@ export type Database = {
       }
     }
     Functions: {
+      conf_adiar_proximo: {
+        Args: { p_item_id: string; p_motivo?: string; p_nova_data: string }
+        Returns: undefined
+      }
+      conf_registrar_execucao: {
+        Args: {
+          p_data_execucao: string
+          p_item_id: string
+          p_observacoes?: string
+        }
+        Returns: undefined
+      }
       generate_maintenance_plans_for_asset: {
         Args: { ativo_id: string }
         Returns: undefined
@@ -1384,7 +1434,14 @@ export type Database = {
       is_system_owner: { Args: never; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "sindico" | "zelador" | "morador" | "fornecedor"
+      app_role:
+        | "admin"
+        | "sindico"
+        | "zelador"
+        | "morador"
+        | "fornecedor"
+        | "funcionario"
+        | "conselho"
       conf_acao: "criacao" | "edicao" | "exclusao" | "validacao"
       manut_tipo: "preventiva" | "corretiva" | "preditiva"
       semaforo: "verde" | "amarelo" | "vermelho"
@@ -1516,7 +1573,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "sindico", "zelador", "morador", "fornecedor"],
+      app_role: [
+        "admin",
+        "sindico",
+        "zelador",
+        "morador",
+        "fornecedor",
+        "funcionario",
+        "conselho",
+      ],
       conf_acao: ["criacao", "edicao", "exclusao", "validacao"],
       manut_tipo: ["preventiva", "corretiva", "preditiva"],
       semaforo: ["verde", "amarelo", "vermelho"],
