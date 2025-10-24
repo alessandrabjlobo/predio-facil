@@ -31,8 +31,7 @@ export type NovoChamadoInput = {
 export type ManutTipo = "preventiva" | "preditiva" | "corretiva";
 export type ExecStatus =
   | "pendente"
-  | "agendada"
-  | "executando"
+  | "em_execucao"
   | "concluida"
   | "cancelada";
 
@@ -508,7 +507,7 @@ export async function listUpcomingManutencoes(limit = 50): Promise<DashManutRow[
   const { data, error } = await supabase
     .from("manutencoes")
     .select("id,titulo,tipo,status,vencimento,ativo_id,ativos:ativo_id(id,nome)")
-    .in("status", ["pendente", "agendada", "executando"])
+    .in("status", ["pendente", "em_execucao"])
     .order("vencimento", { ascending: true, nullsFirst: false })
     .limit(limit);
   if (error) throw error;
@@ -527,7 +526,7 @@ export async function listManutencoesPendentes() {
   const { data, error } = await supabase
     .from("manutencoes")
     .select("*")
-    .in("status", ["pendente", "agendada"])
+    .eq("status", "pendente")
     .order("vencimento", { ascending: true });
   if (error) throw error;
   return data;

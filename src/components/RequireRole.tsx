@@ -1,7 +1,8 @@
 // src/components/RequireRole.tsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { getPerfil, type Papel } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
+import { type Papel } from "@/lib/api";
 
 /**
  * Restringe acesso por papel do usuário.
@@ -22,9 +23,28 @@ export default function RequireRole({
     let mounted = true;
     (async () => {
       try {
-        const perfil = await getPerfil(); // precisa existir em src/lib/api.ts
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !mounted) return;
+
+        // Buscar usuário
+        const { data: usuario } = await supabase
+          .from("usuarios")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .maybeSingle();
+
+        if (!usuario || !mounted) return;
+
+        // Buscar papel principal
+        const { data: relacao } = await supabase
+          .from("usuarios_condominios")
+          .select("papel")
+          .eq("usuario_id", usuario.id)
+          .eq("is_principal", true)
+          .maybeSingle();
+
         if (!mounted) return;
-        setRole(perfil?.papel ?? null);
+        setRole(relacao?.papel as Papel ?? null);
       } catch (e: any) {
         if (!mounted) return;
         setErro(e?.message ?? "Erro ao carregar perfil");
