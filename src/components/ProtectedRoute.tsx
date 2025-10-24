@@ -1,7 +1,7 @@
 // src/components/ProtectedRoute.tsx
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Exige sessão autenticada.

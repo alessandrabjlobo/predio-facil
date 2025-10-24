@@ -1,6 +1,6 @@
 // src/components/OwnerGuard.tsx
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function OwnerGuard({ children }: { children: React.ReactNode }) {
   const [ok, setOk] = useState<null | boolean>(null);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function RequireOwner({ children }: { children: React.ReactNode }) {
   const [ok, setOk] = useState<null | boolean>(null);

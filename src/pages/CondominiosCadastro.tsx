@@ -1,6 +1,6 @@
 // src/pages/CondominiosCadastro.tsx
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null };
 
@@ -90,7 +90,11 @@ export default function CondominiosCadastroPage() {
 
       console.groupCollapsed("create-customer → resposta");
       console.log("status:", res.status);
-      console.log("headers:", Object.fromEntries(res.headers.entries()));
+      const headersObj: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        headersObj[key] = value;
+      });
+      console.log("headers:", headersObj);
       console.log("body:", text);
       console.groupEnd();
 

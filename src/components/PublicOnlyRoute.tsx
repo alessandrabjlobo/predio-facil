@@ -1,7 +1,7 @@
 // src/components/PublicOnlyRoute.tsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Bloqueia páginas públicas (login/signup) para quem já está autenticado.

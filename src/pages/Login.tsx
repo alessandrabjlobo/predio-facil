@@ -1,7 +1,7 @@
 // src/pages/Login.tsx
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/integrations/supabase/client";
 import { getOrCreatePerfil, type Papel } from "@/lib/api";
 
 export default function Login() {
