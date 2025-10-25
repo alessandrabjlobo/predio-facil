@@ -1,4 +1,3 @@
-// src/pages/OS.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
@@ -33,20 +32,6 @@ import {
   XCircle,
 } from "lucide-react";
 
-/** ---- Correção de tipos ----
- * O tipo OSRow (da sua API) pode não declarar os campos abaixo,
- * mas a UI usa eles. Então estendemos localmente para o TS não reclamar.
- */
-type Row = OSRow & {
-  data_abertura?: string | null;
-  data_fechamento?: string | null;
-  abertura?: string | null;
-  fechamento?: string | null;
-  pdf_url?: string | null;
-  pdf_path?: string | null;
-  ativo_id?: string | null;
-};
-
 function cls(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
@@ -65,12 +50,12 @@ export default function OSPage() {
   const [params] = useSearchParams();
   const ativoFilter = params.get("ativo") || undefined;
 
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<OSRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<OSStatus | "todas">("aberta");
 
   const [openForm, setOpenForm] = useState(false);
-  const [form, setForm] = useState<Partial<Row>>({
+  const [form, setForm] = useState<Partial<OSRow>>({
     titulo: "",
     descricao: "",
     responsavel: "",
@@ -82,8 +67,8 @@ export default function OSPage() {
   async function refresh() {
     setLoading(true);
     try {
-      const data = await listOS(ativoFilter ? ({ ativo_id: ativoFilter } as any) : undefined);
-      setRows(data as Row[]);
+      const data = await listOS(ativoFilter ? { ativo_id: ativoFilter } as any : undefined);
+      setRows(data);
     } finally {
       setLoading(false);
     }
@@ -149,10 +134,10 @@ export default function OSPage() {
     }
   }
 
-  function pedirArquivo(os: Row) {
+  function pedirArquivo(os: OSRow) {
     const el = fileRef.current;
     if (!el) return;
-    el.dataset.osid = os.id; // ok no TS por causa do tipo correto do elemento
+    (el as any).dataset.osid = os.id;
     el.click();
   }
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -162,15 +147,14 @@ export default function OSPage() {
     e.currentTarget.value = "";
   }
 
-  // Util: pega a melhor data disponível (data_abertura || abertura)
-  const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
-
   return (
     <div className="p-6 grid gap-6">
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ordens de Serviço</h1>
-          <p className="text-gray-600">Registre, acompanhe e conclua as ordens de serviço do condomínio.</p>
+          <p className="text-gray-600">
+            Registre, acompanhe e conclua as ordens de serviço do condomínio.
+          </p>
           {ativoFilter && (
             <p className="text-xs text-gray-500 mt-1">
               Filtrando por ativo: <span className="font-medium">{ativoFilter}</span>
@@ -197,9 +181,6 @@ export default function OSPage() {
               <TabsTrigger value="cancelada">Canceladas</TabsTrigger>
             </TabsList>
 
-            {/* Obs: o shadcn aceita um único TabsContent com value = {tab}? 
-                Funciona, mas o "oficial" é ter um TabsContent por value.
-                Mantive seu padrão pra não mudar a lógica. */}
             <TabsContent value={tab} className="mt-4">
               {loading ? (
                 <p className="text-gray-500 text-sm">Carregando...</p>
@@ -219,80 +200,109 @@ export default function OSPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((r) => {
-                        const abertura = r.data_abertura ?? r.abertura ?? null;
-                        const fechamento = r.data_fechamento ?? r.fechamento ?? null;
-
-                        return (
-                          <tr key={r.id} className="border-t">
-                            <td className="p-2">{r.titulo}</td>
-                            <td className="p-2">
-                              <span
-                                className={cls(
-                                  "px-2 py-0.5 rounded text-xs font-medium border",
-                                  (r.status ?? "aberta") === "concluida"
-                                    ? "bg-green-50 text-green-700 border-green-200"
-                                    : (r.status ?? "aberta") === "em andamento"
-                                    ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                    : (r.status ?? "aberta") === "cancelada"
-                                    ? "bg-red-50 text-red-700 border-red-200"
-                                    : "bg-gray-50 text-gray-700 border-gray-200"
-                                )}
-                              >
-                                {statusLabel((r.status ?? "aberta") as OSStatus)}
-                              </span>
-                            </td>
-                            <td className="p-2">{r.responsavel || "—"}</td>
-                            <td className="p-2">{fmt(abertura)}</td>
-                            <td className="p-2">{fmt(fechamento)}</td>
-                            <td className="p-2 text-right">
-                              <div className="flex justify-end gap-2">
-                                {r.status !== "concluida" && r.status !== "cancelada" && (
-                                  <>
-                                    <Button size="sm" variant="outline" onClick={() => handleStatus(r.id, "em andamento")}>
-                                      <Clock className="h-4 w-4 mr-1" /> Em andamento
-                                    </Button>
-                                    <Button size="sm" onClick={() => handleStatus(r.id, "concluida")}>
-                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleStatus(r.id, "cancelada")}>
-                                      <XCircle className="h-4 w-4 mr-1" /> Cancelar
-                                    </Button>
-                                  </>
-                                )}
-
-                                {/* Upload PDF */}
-                                <Button size="icon" variant="outline" onClick={() => pedirArquivo(r)} title="Anexar PDF">
-                                  <Upload className="h-4 w-4" />
-                                </Button>
-
-                                {/* Abrir PDF (se disponível) */}
-                                {"pdf_url" in r && r.pdf_url ? (
-                                  <a
-                                    href={r.pdf_url as string}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center justify-center h-8 px-2 border rounded hover:bg-gray-50"
-                                    title="Abrir PDF"
+                      {filtered.map((r) => (
+                        <tr key={r.id} className="border-t">
+                          <td className="p-2">{r.titulo}</td>
+                          <td className="p-2">
+                            <span
+                              className={cls(
+                                "px-2 py-0.5 rounded text-xs font-medium border",
+                                r.status === "concluida"
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : r.status === "em andamento"
+                                  ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                  : r.status === "cancelada"
+                                  ? "bg-red-50 text-red-700 border-red-200"
+                                  : "bg-gray-50 text-gray-700 border-gray-200"
+                              )}
+                            >
+                              {statusLabel((r.status ?? "aberta") as OSStatus)}
+                            </span>
+                          </td>
+                          <td className="p-2">{r.responsavel || "—"}</td>
+                          <td className="p-2">
+                            {r.data_abertura
+                              ? new Date(r.data_abertura).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td className="p-2">
+                            {r.data_fechamento
+                              ? new Date(r.data_fechamento).toLocaleString()
+                              : "—"}
+                          </td>
+                          <td className="p-2 text-right">
+                            <div className="flex justify-end gap-2">
+                              {r.status !== "concluida" && r.status !== "cancelada" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleStatus(r.id, "em andamento")}
+                                  >
+                                    <Clock className="h-4 w-4 mr-1" /> Em andamento
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleStatus(r.id, "concluida")}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleStatus(r.id, "cancelada")}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-1" /> Cancelar
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    title="Anexos"
+                                    onClick={async () => {
+                                      // abre um Dialog local e carrega listOSAnexos(r.id)
+                                      // mostre lista de <a href=...>arquivo.pdf</a> e um input para subir novos
+                                    }}
                                   >
                                     <FileText className="h-4 w-4" />
-                                    <span className="ml-1 text-xs">Abrir PDF</span>
-                                  </a>
-                                ) : "pdf_path" in r && r.pdf_path ? (
-                                  <span className="inline-flex items-center text-xs text-gray-500">
-                                    <FileText className="h-4 w-4 mr-1" /> PDF anexado
-                                  </span>
-                                ) : null}
+                                  </Button>
+                                </>
+                              )}
 
-                                {/* Excluir */}
-                                <Button size="icon" variant="destructive" onClick={() => handleDelete(r.id)} title="Excluir">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => pedirArquivo(r)}
+                              >
+                                <Upload className="h-4 w-4" />
+                              </Button>
+
+                              {r.pdf_url ? (
+                                <a
+                                  href={r.pdf_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center justify-center h-8 px-2 border rounded hover:bg-gray-50"
+                                >
+                                  <FileText className="h-4 w-4" />
+                                  <span className="ml-1 text-xs">Abrir PDF</span>
+                                </a>
+                              ) : r.pdf_path ? (
+                                <span className="inline-flex items-center text-xs text-gray-500">
+                                  <FileText className="h-4 w-4 mr-1" /> PDF anexado
+                                </span>
+                              ) : null}
+
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                onClick={() => handleDelete(r.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -317,7 +327,7 @@ export default function OSPage() {
           <DialogHeader>
             <DialogTitle>Nova Ordem de Serviço</DialogTitle>
           </DialogHeader>
-        <form onSubmit={handleCreate} className="grid gap-3">
+          <form onSubmit={handleCreate} className="grid gap-3">
             <div>
               <Label>Título</Label>
               <Input
