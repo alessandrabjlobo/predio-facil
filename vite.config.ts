@@ -12,14 +12,23 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
     resolve: {
-      alias: {
-        "@": path.resolve(__dirname, "./src"),
-        // Force all imports of the auto-generated client to our runtime-safe fallback
-        "@/integrations/supabase/client": path.resolve(
-          __dirname,
-          "./src/integrations/supabase/client-fallback.ts"
-        ),
-      },
+      alias: [
+        {
+          find: /^@\/integrations\/supabase\/client(\.ts)?$/,
+          replacement: path.resolve(
+            __dirname,
+            "./src/integrations/supabase/client-fallback.ts"
+          ),
+        },
+        {
+          find: path.resolve(__dirname, "./src/integrations/supabase/client.ts"),
+          replacement: path.resolve(
+            __dirname,
+            "./src/integrations/supabase/client-fallback.ts"
+          ),
+        },
+        { find: "@", replacement: path.resolve(__dirname, "./src") },
+      ],
     },
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(env.VITE_SUPABASE_URL),
