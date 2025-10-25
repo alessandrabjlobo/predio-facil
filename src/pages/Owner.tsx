@@ -1,6 +1,7 @@
 // src/pages/Owner.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/env";
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null };
 type Condo = { id: string; nome: string; endereco: string | null; created_at: string };
@@ -86,13 +87,13 @@ export default function OwnerPage() {
       const accessToken = s?.session?.access_token;
 
       const resp = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-customer`,
+        `${SUPABASE_URL}/functions/v1/create-customer`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-            apikey: import.meta.env.VITE_SUPABASE_ANON_KEY!,
+            apikey: SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({ name, email, condoName, address, cpf: cpfDigits }),
         }

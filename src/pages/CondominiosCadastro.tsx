@@ -1,6 +1,7 @@
 // src/pages/CondominiosCadastro.tsx
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/env";
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null };
 
@@ -66,15 +67,12 @@ export default function CondominiosCadastroPage() {
         return;
       }
 
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-      const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
       const res = await fetch(`${SUPABASE_URL}/functions/v1/create-customer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
-          "apikey": ANON_KEY,
+          "apikey": SUPABASE_ANON_KEY,
           "Cache-Control": "no-cache",
         },
         body: JSON.stringify({
