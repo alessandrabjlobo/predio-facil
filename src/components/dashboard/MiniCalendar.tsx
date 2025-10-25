@@ -17,9 +17,13 @@ type AgendaEvent = {
   conformidade_item_id: string | null;
 };
 
-type Props = { onOpenAgenda: (iso?: string) => void };
+type Props = { 
+  onOpenAgenda: (iso?: string) => void;
+  view?: string;
+  events?: any[];
+};
 
-export default function MiniCalendar({ onOpenAgenda }: Props) {
+export default function MiniCalendar({ onOpenAgenda, view, events: externalEvents }: Props) {
   const [cursor, setCursor] = useState<Date>(new Date());
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [loading, setLoading] = useState(false);

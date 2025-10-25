@@ -8,9 +8,10 @@ type Props = {
   icon?: ReactNode;
   delta?: { text: string; positive?: boolean };
   onClick?: () => void;
+  hint?: string;
 };
 
-export default function KpiCard({ title, value, icon, delta, onClick }: Props) {
+export default function KpiCard({ title, value, icon, delta, onClick, hint }: Props) {
   return (
     <Card
       role={onClick ? "button" : undefined}
@@ -35,6 +36,11 @@ export default function KpiCard({ title, value, icon, delta, onClick }: Props) {
             }
           >
             {delta.text}
+          </div>
+        ) : null}
+        {hint ? (
+          <div className="mt-2 text-[11px] text-slate-500">
+            {hint}
           </div>
         ) : null}
       </CardContent>

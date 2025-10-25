@@ -229,7 +229,7 @@ export default function DashboardAdmin() {
             </div>
           </CardHeader>
           <CardContent>
-            <MiniCalendar view="listWeek" events={eventos} />
+            <MiniCalendar onOpenAgenda={(iso) => nav(`/agenda${iso ? `?date=${iso}` : ''}`)} view="listWeek" events={eventos} />
           </CardContent>
         </Card>
 
