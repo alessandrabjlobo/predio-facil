@@ -23,6 +23,8 @@ import Conformidade from "@/pages/Conformidade";
 import ConfiguracoesPage from "@/pages/Configuracoes";
 import Preventivas from "@/pages/Preventivas";
 import DashboardAdmin from "@/pages/DashboardAdmin";
+import Fornecedores from "@/pages/Fornecedores";
+import Programacao from "@/pages/Programacao";
 
 // Ordens de Serviço
 import OS from "@/pages/OS";

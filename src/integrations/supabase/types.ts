@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      ativo_documentos: {
+        Row: {
+          ativo_id: string
+          created_at: string | null
+          data_emissao: string | null
+          data_validade: string | null
+          file_path: string
+          id: string
+          nome_arquivo: string
+          obrigatorio: boolean | null
+          tipo_documento: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          ativo_id: string
+          created_at?: string | null
+          data_emissao?: string | null
+          data_validade?: string | null
+          file_path: string
+          id?: string
+          nome_arquivo: string
+          obrigatorio?: boolean | null
+          tipo_documento: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          ativo_id?: string
+          created_at?: string | null
+          data_emissao?: string | null
+          data_validade?: string | null
+          file_path?: string
+          id?: string
+          nome_arquivo?: string
+          obrigatorio?: boolean | null
+          tipo_documento?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ativo_documentos_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativo_historico_manutencao"
+            referencedColumns: ["ativo_id"]
+          },
+          {
+            foreignKeyName: "ativo_documentos_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ativo_documentos_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ativo_status_logs: {
         Row: {
           acao: string
@@ -131,10 +192,13 @@ export type Database = {
           nome: string
           numero_serie: string | null
           observacoes: string | null
+          proxima_manutencao: string | null
           requer_conformidade: boolean | null
+          status_conformidade: string | null
           tipo_id: string | null
           tipo_uso: string | null
           torre: string | null
+          ultima_manutencao: string | null
           validade_carga: string | null
           validade_teste_hidrostatico: string | null
           zona_localizacao: string | null
@@ -156,10 +220,13 @@ export type Database = {
           nome: string
           numero_serie?: string | null
           observacoes?: string | null
+          proxima_manutencao?: string | null
           requer_conformidade?: boolean | null
+          status_conformidade?: string | null
           tipo_id?: string | null
           tipo_uso?: string | null
           torre?: string | null
+          ultima_manutencao?: string | null
           validade_carga?: string | null
           validade_teste_hidrostatico?: string | null
           zona_localizacao?: string | null
@@ -181,10 +248,13 @@ export type Database = {
           nome?: string
           numero_serie?: string | null
           observacoes?: string | null
+          proxima_manutencao?: string | null
           requer_conformidade?: boolean | null
+          status_conformidade?: string | null
           tipo_id?: string | null
           tipo_uso?: string | null
           torre?: string | null
+          ultima_manutencao?: string | null
           validade_carga?: string | null
           validade_teste_hidrostatico?: string | null
           zona_localizacao?: string | null
@@ -641,6 +711,56 @@ export type Database = {
         }
         Relationships: []
       }
+      fornecedores: {
+        Row: {
+          ativo: boolean | null
+          cnpj: string | null
+          condominio_id: string
+          created_at: string | null
+          email: string | null
+          especialidade: string[] | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cnpj?: string | null
+          condominio_id: string
+          created_at?: string | null
+          email?: string | null
+          especialidade?: string[] | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cnpj?: string | null
+          condominio_id?: string
+          created_at?: string | null
+          email?: string | null
+          especialidade?: string[] | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fornecedores_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locais: {
         Row: {
           created_at: string | null
@@ -858,6 +978,7 @@ export type Database = {
           aceite_em: string | null
           ativo_id: string | null
           centro_custo: string | null
+          checklist_completo: boolean | null
           checklist_status: Json | null
           condominio_id: string | null
           created_at: string | null
@@ -875,6 +996,7 @@ export type Database = {
           executor_empresa: string | null
           executor_nome: string | null
           executor_observacoes: string | null
+          fornecedor_id: string | null
           id: string
           iniciada_por: string | null
           local: string | null
@@ -885,10 +1007,12 @@ export type Database = {
           pdf_path: string | null
           plano_id: string | null
           prioridade: string
+          programacao_id: string | null
           responsavel: string | null
           sla_vencimento: string | null
           solicitante_id: string | null
           status: string
+          status_validacao: string | null
           tipo_executor: string | null
           titulo: string
           updated_at: string | null
@@ -899,6 +1023,7 @@ export type Database = {
           aceite_em?: string | null
           ativo_id?: string | null
           centro_custo?: string | null
+          checklist_completo?: boolean | null
           checklist_status?: Json | null
           condominio_id?: string | null
           created_at?: string | null
@@ -916,6 +1041,7 @@ export type Database = {
           executor_empresa?: string | null
           executor_nome?: string | null
           executor_observacoes?: string | null
+          fornecedor_id?: string | null
           id?: string
           iniciada_por?: string | null
           local?: string | null
@@ -926,10 +1052,12 @@ export type Database = {
           pdf_path?: string | null
           plano_id?: string | null
           prioridade?: string
+          programacao_id?: string | null
           responsavel?: string | null
           sla_vencimento?: string | null
           solicitante_id?: string | null
           status?: string
+          status_validacao?: string | null
           tipo_executor?: string | null
           titulo: string
           updated_at?: string | null
@@ -940,6 +1068,7 @@ export type Database = {
           aceite_em?: string | null
           ativo_id?: string | null
           centro_custo?: string | null
+          checklist_completo?: boolean | null
           checklist_status?: Json | null
           condominio_id?: string | null
           created_at?: string | null
@@ -957,6 +1086,7 @@ export type Database = {
           executor_empresa?: string | null
           executor_nome?: string | null
           executor_observacoes?: string | null
+          fornecedor_id?: string | null
           id?: string
           iniciada_por?: string | null
           local?: string | null
@@ -967,10 +1097,12 @@ export type Database = {
           pdf_path?: string | null
           plano_id?: string | null
           prioridade?: string
+          programacao_id?: string | null
           responsavel?: string | null
           sla_vencimento?: string | null
           solicitante_id?: string | null
           status?: string
+          status_validacao?: string | null
           tipo_executor?: string | null
           titulo?: string
           updated_at?: string | null
@@ -1007,6 +1139,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "os_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "os_iniciada_por_fkey"
             columns: ["iniciada_por"]
             isOneToOne: false
@@ -1039,6 +1178,13 @@ export type Database = {
             columns: ["plano_id"]
             isOneToOne: false
             referencedRelation: "planos_manutencao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_programacao_id_fkey"
+            columns: ["programacao_id"]
+            isOneToOne: false
+            referencedRelation: "programacao_manutencao"
             referencedColumns: ["id"]
           },
           {
@@ -1082,6 +1228,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "os_anexos_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "os"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      os_checklist_itens: {
+        Row: {
+          concluido: boolean | null
+          created_at: string | null
+          descricao: string
+          id: string
+          obrigatorio: boolean | null
+          observacao: string | null
+          ordem: number | null
+          os_id: string
+        }
+        Insert: {
+          concluido?: boolean | null
+          created_at?: string | null
+          descricao: string
+          id?: string
+          obrigatorio?: boolean | null
+          observacao?: string | null
+          ordem?: number | null
+          os_id: string
+        }
+        Update: {
+          concluido?: boolean | null
+          created_at?: string | null
+          descricao?: string
+          id?: string
+          obrigatorio?: boolean | null
+          observacao?: string | null
+          ordem?: number | null
+          os_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_checklist_itens_os_id_fkey"
             columns: ["os_id"]
             isOneToOne: false
             referencedRelation: "os"
@@ -1135,48 +1322,60 @@ export type Database = {
         Row: {
           antecedencia_dias: number | null
           ativo_id: string | null
+          auto_gerar_programacao: boolean | null
           checklist: Json | null
           condominio_id: string | null
           conf_categoria_id: string | null
           created_at: string | null
+          dias_alerta: number | null
           id: string
           is_legal: boolean | null
+          meses_antecedencia: number | null
           periodicidade: unknown
           proxima_execucao: string
           responsavel: string | null
           sla_dias: number | null
+          template_origem: string | null
           tipo: Database["public"]["Enums"]["manut_tipo"]
           titulo: string
         }
         Insert: {
           antecedencia_dias?: number | null
           ativo_id?: string | null
+          auto_gerar_programacao?: boolean | null
           checklist?: Json | null
           condominio_id?: string | null
           conf_categoria_id?: string | null
           created_at?: string | null
+          dias_alerta?: number | null
           id?: string
           is_legal?: boolean | null
+          meses_antecedencia?: number | null
           periodicidade: unknown
           proxima_execucao: string
           responsavel?: string | null
           sla_dias?: number | null
+          template_origem?: string | null
           tipo?: Database["public"]["Enums"]["manut_tipo"]
           titulo: string
         }
         Update: {
           antecedencia_dias?: number | null
           ativo_id?: string | null
+          auto_gerar_programacao?: boolean | null
           checklist?: Json | null
           condominio_id?: string | null
           conf_categoria_id?: string | null
           created_at?: string | null
+          dias_alerta?: number | null
           id?: string
           is_legal?: boolean | null
+          meses_antecedencia?: number | null
           periodicidade?: unknown
           proxima_execucao?: string
           responsavel?: string | null
           sla_dias?: number | null
+          template_origem?: string | null
           tipo?: Database["public"]["Enums"]["manut_tipo"]
           titulo?: string
         }
@@ -1207,6 +1406,95 @@ export type Database = {
             columns: ["conf_categoria_id"]
             isOneToOne: false
             referencedRelation: "conf_categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planos_manutencao_template_origem_fkey"
+            columns: ["template_origem"]
+            isOneToOne: false
+            referencedRelation: "manut_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programacao_manutencao: {
+        Row: {
+          alerta_enviado: boolean | null
+          ativo_id: string
+          condominio_id: string
+          created_at: string | null
+          data_prevista: string
+          id: string
+          os_id: string | null
+          plano_id: string
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          alerta_enviado?: boolean | null
+          ativo_id: string
+          condominio_id: string
+          created_at?: string | null
+          data_prevista: string
+          id?: string
+          os_id?: string | null
+          plano_id: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          alerta_enviado?: boolean | null
+          ativo_id?: string
+          condominio_id?: string
+          created_at?: string | null
+          data_prevista?: string
+          id?: string
+          os_id?: string | null
+          plano_id?: string
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programacao_manutencao_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativo_historico_manutencao"
+            referencedColumns: ["ativo_id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "os"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "calendario_manutencoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos_manutencao"
             referencedColumns: ["id"]
           },
         ]
@@ -1272,6 +1560,7 @@ export type Database = {
           cargo: string | null
           condominio_id: string
           created_at: string | null
+          descricao_cargo: string | null
           is_principal: boolean | null
           papel: Database["public"]["Enums"]["app_role"]
           usuario_id: string
@@ -1280,6 +1569,7 @@ export type Database = {
           cargo?: string | null
           condominio_id: string
           created_at?: string | null
+          descricao_cargo?: string | null
           is_principal?: boolean | null
           papel: Database["public"]["Enums"]["app_role"]
           usuario_id: string
@@ -1288,6 +1578,7 @@ export type Database = {
           cargo?: string | null
           condominio_id?: string
           created_at?: string | null
+          descricao_cargo?: string | null
           is_principal?: boolean | null
           papel?: Database["public"]["Enums"]["app_role"]
           usuario_id?: string
@@ -1396,6 +1687,10 @@ export type Database = {
       }
     }
     Functions: {
+      atualizar_status_conformidade_ativo: {
+        Args: { p_ativo_id: string }
+        Returns: string
+      }
       conf_adiar_proximo: {
         Args: { p_item_id: string; p_motivo?: string; p_nova_data: string }
         Returns: undefined

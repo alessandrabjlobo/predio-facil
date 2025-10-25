@@ -7,7 +7,7 @@ import Header from "./Header";
  * Importante: NÃO renderize <BrowserRouter> aqui.
  * O Router único fica em src/main.tsx.
  */
-export default function Layout() {
+export default function Layout({ children }: { children?: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(() => {
     const saved = localStorage.getItem("sidebarCollapsed");
     return saved === "true";
@@ -25,7 +25,7 @@ export default function Layout() {
       <div className="flex-1 flex flex-col">
         <Header onToggleCollapse={toggleCollapse} />
         <main className="flex-1 overflow-auto">
-          <Outlet />
+          {children || <Outlet />}
         </main>
       </div>
     </div>
