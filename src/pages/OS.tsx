@@ -11,24 +11,52 @@ import {
   OSStatus, // 'aberta' | 'em andamento' | 'concluida' | 'cancelada'
 } from "@/lib/api";
 
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { FileText, Trash2, Upload, CheckCircle2, Clock, PlusCircle, XCircle } from "lucide-react";
-import StatusPill from "@/components/StatusPill";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  FileText,
+  Trash2,
+  Upload,
+  CheckCircle2,
+  Clock,
+  PlusCircle,
+  XCircle,
+} from "lucide-react";
 
-/* util simples p/ classes condicionais */
+/** ---- Correção de tipos ----
+ * O tipo OSRow (da sua API) pode não declarar os campos abaixo,
+ * mas a UI usa eles. Então estendemos localmente para o TS não reclamar.
+ */
+type Row = OSRow & {
+  data_abertura?: string | null;
+  data_fechamento?: string | null;
+  abertura?: string | null;
+  fechamento?: string | null;
+  pdf_url?: string | null;
+  pdf_path?: string | null;
+  ativo_id?: string | null;
+};
+
 function cls(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
 
 function statusLabel(s: OSStatus) {
   switch (s) {
-    case "aberta": return "Abertas";
+    case "aberta": return "Aberta";
     case "em andamento": return "Em andamento";
-    case "concluida": return "Concluídas";
-    case "cancelada": return "Canceladas";
+    case "concluida": return "Concluída";
+    case "cancelada": return "Cancelada";
     default: return s;
   }
 }
@@ -37,12 +65,16 @@ export default function OSPage() {
   const [params] = useSearchParams();
   const ativoFilter = params.get("ativo") || undefined;
 
-  const [rows, setRows] = useState<OSRow[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<OSStatus | "todas">("todas");
+  const [tab, setTab] = useState<OSStatus | "todas">("aberta");
 
   const [openForm, setOpenForm] = useState(false);
-  const [form, setForm] = useState<Partial<OSRow>>({ titulo: "", descricao: "", responsavel: "" });
+  const [form, setForm] = useState<Partial<Row>>({
+    titulo: "",
+    descricao: "",
+    responsavel: "",
+  });
 
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -51,7 +83,7 @@ export default function OSPage() {
     setLoading(true);
     try {
       const data = await listOS(ativoFilter ? ({ ativo_id: ativoFilter } as any) : undefined);
-      setRows(data);
+      setRows(data as Row[]);
     } finally {
       setLoading(false);
     }
@@ -117,10 +149,10 @@ export default function OSPage() {
     }
   }
 
-  function pedirArquivo(os: OSRow) {
+  function pedirArquivo(os: Row) {
     const el = fileRef.current;
     if (!el) return;
-    (el as any).dataset.osid = os.id;
+    el.dataset.osid = os.id; // ok no TS por causa do tipo correto do elemento
     el.click();
   }
   async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -130,138 +162,145 @@ export default function OSPage() {
     e.currentTarget.value = "";
   }
 
+  // Util: pega a melhor data disponível (data_abertura || abertura)
+  const fmt = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
+
   return (
-    <div className="px-6 py-5 max-w-[1320px] mx-auto space-y-4">
-      {/* Cabeçalho da página */}
-      <div className="flex items-start justify-between">
+    <div className="p-6 grid gap-6">
+      <div className="flex justify-between items-start">
         <div>
-          <h1 className="section-title">Ordens de Serviço</h1>
-          <p className="section-desc">Registre, acompanhe e conclua as ordens de serviço do condomínio.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Ordens de Serviço</h1>
+          <p className="text-gray-600">Registre, acompanhe e conclua as ordens de serviço do condomínio.</p>
           {ativoFilter && (
             <p className="text-xs text-gray-500 mt-1">
               Filtrando por ativo: <span className="font-medium">{ativoFilter}</span>
             </p>
           )}
         </div>
-        <Button variant="outline" className="btn-outline h-9" onClick={() => setOpenForm(true)}>
-          <PlusCircle className="h-4 w-4 mr-2" /> Nova OS
+        <Button onClick={() => setOpenForm(true)}>
+          <PlusCircle className="h-4 w-4 mr-1" /> Nova OS
         </Button>
       </div>
 
-      {/* Card principal (estilo do print) */}
-      <div className="card-like p-4">
-        {/* Título do card */}
-        <div className="mb-3">
-          <h3 className="text-[15px] font-semibold text-gray-900">Ordens de Serviço</h3>
-          <p className="text-sm text-gray-500">Filtre por status e acompanhe o andamento.</p>
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Ordens de Serviço</CardTitle>
+          <CardDescription>Filtre por status e acompanhe o andamento.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs value={tab} onValueChange={(v: any) => setTab(v)}>
+            <TabsList className="flex flex-wrap gap-2">
+              <TabsTrigger value="todas">Todas</TabsTrigger>
+              <TabsTrigger value="aberta">Abertas</TabsTrigger>
+              <TabsTrigger value="em andamento">Em andamento</TabsTrigger>
+              <TabsTrigger value="concluida">Concluídas</TabsTrigger>
+              <TabsTrigger value="cancelada">Canceladas</TabsTrigger>
+            </TabsList>
 
-        {/* Abas “pill” centralizadas (todas / abertas / em andamento / concluídas / canceladas) */}
-        <div className="w-full flex justify-center">
-          <div className="tabs-pill">
-            {(["todas", "aberta", "em andamento", "concluida", "cancelada"] as const).map((k) => (
-              <button
-                key={k}
-                data-active={tab === k}
-                onClick={() => setTab(k as any)}
-                aria-pressed={tab === k}
-              >
-                {k === "todas" ? "Todas" : statusLabel(k as OSStatus)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tabela */}
-        <div className="table-wrap mt-4">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Título</th>
-                <th>Status</th>
-                <th>Responsável</th>
-                <th>Abertura</th>
-                <th>Fechamento</th>
-                <th className="text-right pr-4">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
+            {/* Obs: o shadcn aceita um único TabsContent com value = {tab}? 
+                Funciona, mas o "oficial" é ter um TabsContent por value.
+                Mantive seu padrão pra não mudar a lógica. */}
+            <TabsContent value={tab} className="mt-4">
               {loading ? (
-                <tr>
-                  <td className="px-4 py-6 text-center text-gray-500" colSpan={6}>
-                    Carregando…
-                  </td>
-                </tr>
+                <p className="text-gray-500 text-sm">Carregando...</p>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td className="px-4 py-6 text-center text-gray-500" colSpan={6}>
-                    Nenhuma OS encontrada.
-                  </td>
-                </tr>
+                <p className="text-gray-500 text-sm">Nenhuma OS encontrada.</p>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.titulo}</td>
-                    <td>
-                      <StatusPill status={(r.status ?? "aberta") as OSStatus} />
-                    </td>
-                    <td>{r.responsavel || "—"}</td>
-                    <td>{(r as any).data_abertura ? new Date((r as any).data_abertura).toLocaleString() : "—"}</td>
-                    <td>{(r as any).data_fechamento ? new Date((r as any).data_fechamento).toLocaleString() : "—"}</td>
-                    <td className="text-right pr-4">
-                      <div className="flex justify-end gap-2">
-                        {r.status !== "concluida" && r.status !== "cancelada" && (
-                          <>
-                            <Button className="btn-outline h-8" variant="outline" onClick={() => handleStatus(r.id, "em andamento")}>
-                              <Clock className="h-4 w-4 mr-1" /> Em andamento
-                            </Button>
-                            <Button className="btn-outline h-8" onClick={() => handleStatus(r.id, "concluida")}>
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
-                            </Button>
-                            <Button className="btn-outline h-8" variant="outline" onClick={() => handleStatus(r.id, "cancelada")}>
-                              <XCircle className="h-4 w-4 mr-1" /> Cancelar
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="btn-outline h-8 w-9 p-0"
-                              title="Anexos"
-                              onClick={() => pedirArquivo(r)}
-                            >
-                              <Upload className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                <div className="overflow-auto rounded border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr className="[&>th]:p-2 text-left">
+                        <th>Título</th>
+                        <th>Status</th>
+                        <th>Responsável</th>
+                        <th>Abertura</th>
+                        <th>Fechamento</th>
+                        <th className="text-right pr-3">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((r) => {
+                        const abertura = r.data_abertura ?? r.abertura ?? null;
+                        const fechamento = r.data_fechamento ?? r.fechamento ?? null;
 
-                        {r.pdf_url ? (
-                          <a
-                            href={r.pdf_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center justify-center h-8 px-2 border rounded hover:bg-gray-50"
-                            title="Abrir PDF"
-                          >
-                            <FileText className="w-4 h-4" />
-                            <span className="ml-1 text-xs">Abrir PDF</span>
-                          </a>
-                        ) : (r as any).pdf_path ? (
-                          <span className="inline-flex items-center text-xs text-gray-500">
-                            <FileText className="h-4 w-4 mr-1" /> PDF anexado
-                          </span>
-                        ) : null}
+                        return (
+                          <tr key={r.id} className="border-t">
+                            <td className="p-2">{r.titulo}</td>
+                            <td className="p-2">
+                              <span
+                                className={cls(
+                                  "px-2 py-0.5 rounded text-xs font-medium border",
+                                  (r.status ?? "aberta") === "concluida"
+                                    ? "bg-green-50 text-green-700 border-green-200"
+                                    : (r.status ?? "aberta") === "em andamento"
+                                    ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                    : (r.status ?? "aberta") === "cancelada"
+                                    ? "bg-red-50 text-red-700 border-red-200"
+                                    : "bg-gray-50 text-gray-700 border-gray-200"
+                                )}
+                              >
+                                {statusLabel((r.status ?? "aberta") as OSStatus)}
+                              </span>
+                            </td>
+                            <td className="p-2">{r.responsavel || "—"}</td>
+                            <td className="p-2">{fmt(abertura)}</td>
+                            <td className="p-2">{fmt(fechamento)}</td>
+                            <td className="p-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                {r.status !== "concluida" && r.status !== "cancelada" && (
+                                  <>
+                                    <Button size="sm" variant="outline" onClick={() => handleStatus(r.id, "em andamento")}>
+                                      <Clock className="h-4 w-4 mr-1" /> Em andamento
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleStatus(r.id, "concluida")}>
+                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Concluir
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleStatus(r.id, "cancelada")}>
+                                      <XCircle className="h-4 w-4 mr-1" /> Cancelar
+                                    </Button>
+                                  </>
+                                )}
 
-                        <Button size="icon" variant="destructive" onClick={() => handleDelete(r.id)} title="Excluir">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                                {/* Upload PDF */}
+                                <Button size="icon" variant="outline" onClick={() => pedirArquivo(r)} title="Anexar PDF">
+                                  <Upload className="h-4 w-4" />
+                                </Button>
+
+                                {/* Abrir PDF (se disponível) */}
+                                {"pdf_url" in r && r.pdf_url ? (
+                                  <a
+                                    href={r.pdf_url as string}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center h-8 px-2 border rounded hover:bg-gray-50"
+                                    title="Abrir PDF"
+                                  >
+                                    <FileText className="h-4 w-4" />
+                                    <span className="ml-1 text-xs">Abrir PDF</span>
+                                  </a>
+                                ) : "pdf_path" in r && r.pdf_path ? (
+                                  <span className="inline-flex items-center text-xs text-gray-500">
+                                    <FileText className="h-4 w-4 mr-1" /> PDF anexado
+                                  </span>
+                                ) : null}
+
+                                {/* Excluir */}
+                                <Button size="icon" variant="destructive" onClick={() => handleDelete(r.id)} title="Excluir">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* input escondido para upload */}
       <input
@@ -272,13 +311,13 @@ export default function OSPage() {
         onChange={onPickFile}
       />
 
-      {/* Modal criar OS (shadcn) */}
+      {/* Modal criar OS */}
       <Dialog open={openForm} onOpenChange={setOpenForm}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Nova Ordem de Serviço</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="grid gap-3">
+        <form onSubmit={handleCreate} className="grid gap-3">
             <div>
               <Label>Título</Label>
               <Input
