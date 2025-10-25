@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/env";
 import RequireOwner from "@/components/RequireOwner";
+
 
 type ApiState = { loading: boolean; msg: string | null; err: string | null; magic?: string | null };
 
@@ -38,12 +38,12 @@ export default function CondoCreate() {
       const { data: s } = await supabase.auth.getSession();
       const accessToken = s?.session?.access_token;
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create-customer`, {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-customer`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          apikey: SUPABASE_ANON_KEY,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify({ name, email, condoName, address, cpf: cpfNum }),
       });
