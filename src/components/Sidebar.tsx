@@ -1,97 +1,133 @@
-// src/components/Sidebar.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Building2,
-  Home,
+  LayoutDashboard,
   Wrench,
   Users,
   Package,
-  BarChart3,
   Settings,
   LogOut,
   ShieldCheck,
-  Calendar,
   ClipboardList,
-  Store,
   FileText,
-  CheckSquare,
-  TrendingUp,
-  Briefcase,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
+import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 
 type NavItem = { name: string; href: string; icon: LucideIcon };
+type NavGroup = { label: string; items: NavItem[] };
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+}
+
+export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
-  const { role, loading } = useUserRole();
+  const { role } = useUserRole();
   const [userName, setUserName] = useState<string>("Usuário");
-  const [condoName, setCondoName] = useState<string>("Condomínio");
+  const { rows, loading } = useCondominiosDoUsuario();
+  const ids = useMemo(() => rows.map(r => r.condominio_id), [rows]);
+  const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
 
-  const navigation: NavItem[] = useMemo(() => {
-    const base = [
-      { name: "Início", href: "/", icon: Home },
-      { name: "Agenda", href: "/agenda", icon: Calendar },
-    ];
-
+  const navigationGroups: NavGroup[] = useMemo(() => {
     if (role === "owner") {
       return [
-        { name: "Painel do Dono", href: "/owner", icon: Home },
-        { name: "Condomínios", href: "/owner/condominios", icon: Building2 },
-        { name: "Usuários", href: "/owner/usuarios", icon: Users },
+        {
+          label: "Dashboard",
+          items: [
+            { name: "Painel do Dono", href: "/owner", icon: LayoutDashboard },
+            { name: "Condomínios", href: "/owner/condominios", icon: Building2 },
+            { name: "Usuários", href: "/owner/usuarios", icon: Users },
+          ],
+        },
       ];
     }
 
     if (role === "admin") {
       return [
-        ...base,
-        { name: "Usuários", href: "/usuarios", icon: Users },
-        { name: "Ativos", href: "/ativos", icon: Package },
-        { name: "Relatórios", href: "/relatorios", icon: FileText },
-        { name: "Configurações", href: "/configuracoes", icon: Settings },
+        {
+          label: "Dashboard",
+          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
+        },
+        {
+          label: "Operacional",
+          items: [
+            { name: "Usuários", href: "/usuarios", icon: Users },
+            { name: "Relatórios", href: "/relatorios", icon: FileText },
+          ],
+        },
+        {
+          label: "Ativos",
+          items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }],
+        },
+        {
+          label: "Configurações",
+          items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }],
+        },
       ];
     }
 
     if (role === "sindico") {
       return [
-        ...base,
-        { name: "Chamados", href: "/chamados", icon: Wrench },
-        { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
-        { name: "Ativos", href: "/ativos", icon: Package },
-        { name: "Preventivas", href: "/preventivas", icon: Calendar },
-        { name: "Conformidade", href: "/conformidade", icon: ShieldCheck },
-        { name: "Fornecedores", href: "/marketplace", icon: Store },
-        { name: "Relatórios", href: "/relatorios", icon: FileText },
+        {
+          label: "Dashboard",
+          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
+        },
+        {
+          label: "Operacional",
+          items: [
+            { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
+            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
+            { name: "Chamados", href: "/chamados", icon: Wrench },
+          ],
+        },
+        {
+          label: "Ativos",
+          items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }],
+        },
+        {
+          label: "Configurações",
+          items: [
+            { name: "Relatórios", href: "/relatorios", icon: FileText },
+            { name: "Configurações", href: "/configuracoes", icon: Settings },
+          ],
+        },
       ];
     }
 
     if (role === "funcionario" || role === "zelador") {
       return [
-        ...base,
-        { name: "Minhas Tarefas", href: "/minhas-tarefas", icon: CheckSquare },
-        { name: "Chamados", href: "/chamados", icon: Wrench },
-        { name: "Ativos", href: "/ativos", icon: Package },
+        {
+          label: "Dashboard",
+          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
+        },
+        {
+          label: "Operacional",
+          items: [
+            { name: "Chamados", href: "/chamados", icon: Wrench },
+          ],
+        },
+        {
+          label: "Ativos",
+          items: [{ name: "Ativos", href: "/ativos", icon: Package }],
+        },
       ];
     }
 
-    if (role === "fornecedor") {
-      return [
-        ...base,
-        { name: "Oportunidades", href: "/oportunidades", icon: TrendingUp },
-        { name: "Minha Equipe", href: "/minha-equipe", icon: Users },
-        { name: "Serviços", href: "/servicos", icon: Briefcase },
-      ];
-    }
-
-    return base;
+    return [
+      {
+        label: "Dashboard",
+        items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
+      },
+    ];
   }, [role]);
 
-  const hasConfigInNav = navigation.some((n) => n.href === "/configuracoes");
-
-  useMemo(() => {
+  useEffect(() => {
     (async () => {
       const { data: userResp } = await supabase.auth.getUser();
       const user = userResp.user;
@@ -111,95 +147,140 @@ export default function Sidebar() {
           "Usuário";
         setUserName(nm);
       }
-
-      const cond =
-        (user?.user_metadata?.condominio as string) ||
-        (user?.user_metadata?.condominio_nome as string) ||
-        "Seu Condomínio";
-      setCondoName(cond);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!loading) {
+      if (!current || (ids.length && !ids.includes(current))) {
+        const fallback = ids[0] ?? null;
+        if (fallback) {
+          setCurrent(fallback);
+          setCurrentCondominioId(fallback);
+        }
+      }
+    }
+  }, [loading, ids.join(","), current]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/login");
   }
 
+  const currentCondoName = rows.find(r => r.condominio_id === current)?.condominios?.nome || "Selecione";
+
   return (
-    <div className="w-64 bg-white shadow-sm border-r flex flex-col">
+    <div
+      className={`${
+        collapsed ? "w-16" : "w-64"
+      } bg-white shadow-sm border-r flex flex-col transition-all duration-300`}
+    >
       {/* Logo */}
       <div className="p-6 border-b">
         <div className="flex items-center space-x-3">
-          <Building2 className="h-8 w-8 text-blue-600" />
-        <div>
-            <h1 className="text-xl font-bold text-gray-900">CondoMaint</h1>
-            <p className="text-xs text-gray-500">
-              {role === "owner" ? "Painel do Dono" : "Sistema de Manutenção"}
-            </p>
-          </div>
+          <Building2 className="h-8 w-8 text-primary flex-shrink-0" />
+          {!collapsed && (
+            <div>
+              <h1 className="text-xl font-bold text-foreground">CondoMaintain</h1>
+              <p className="text-xs text-muted-foreground">Gestão de Manutenções</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
-        {navigation.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            end={item.href === "/"}
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-blue-50 text-blue-700 border-r-2 border-blue-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              }`
-            }
-          >
-            <item.icon className="h-5 w-5" />
-            <span>{item.name}</span>
-          </NavLink>
+      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+        {navigationGroups.map((group) => (
+          <div key={group.label}>
+            {!collapsed && (
+              <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {group.label}
+              </h3>
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  end={item.href === "/"}
+                  className={({ isActive }) =>
+                    `flex items-center ${
+                      collapsed ? "justify-center" : "space-x-3"
+                    } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`
+                  }
+                  title={collapsed ? item.name : undefined}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  {!collapsed && <span>{item.name}</span>}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      {/* User Section */}
-      <div className="p-4 border-t">
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-900">{userName}</p>
-          <p className="text-xs text-gray-500">
-            {role === "owner"
-              ? "Dono do Sistema"
-              : role === "admin"
-              ? "Administrador"
-              : role === "sindico"
-              ? "Síndico"
-              : role === "funcionario" || role === "zelador"
-              ? "Funcionário"
-              : role === "fornecedor"
-              ? "Fornecedor"
-              : "Usuário"}
-          </p>
-          {role !== "owner" && <p className="text-xs text-gray-500">{condoName}</p>}
-        </div>
+      {/* Footer Section */}
+      <div className="p-4 border-t space-y-3">
+        {/* Condominium Selector */}
+        {!collapsed && role !== "owner" && (
+          <div className="mb-3">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+              Condomínio
+            </label>
+            <div className="relative">
+              <select
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground appearance-none pr-8"
+                disabled={loading || rows.length === 0}
+                value={current ?? ""}
+                onChange={(e) => {
+                  setCurrent(e.target.value);
+                  setCurrentCondominioId(e.target.value);
+                }}
+              >
+                {rows.map((r) => (
+                  <option key={r.condominio_id} value={r.condominio_id}>
+                    {r.condominios?.nome ?? r.condominio_id}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
+          </div>
+        )}
 
-        <div className="space-y-2">
-          {/* Botão extra de Configurações no rodapé apenas se NÃO existe no menu principal */}
-          {role !== "owner" && !hasConfigInNav && (
-            <NavLink to="/configuracoes" className="w-full">
-              <div className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-gray-100">
-                <Settings className="h-4 w-4" />
-                Configurações
-              </div>
-            </NavLink>
-          )}
+        {/* User Info */}
+        {!collapsed && (
+          <div className="mb-3">
+            <p className="text-sm font-medium text-foreground">{userName}</p>
+            <p className="text-xs text-muted-foreground">
+              {role === "owner"
+                ? "Dono do Sistema"
+                : role === "admin"
+                ? "Administrador"
+                : role === "sindico"
+                ? "Síndico"
+                : role === "funcionario" || role === "zelador"
+                ? "Funcionário"
+                : "Usuário"}
+            </p>
+          </div>
+        )}
 
-          <button
-            className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-            Sair
-          </button>
-        </div>
+        {/* Logout Button */}
+        <button
+          className={`w-full flex items-center ${
+            collapsed ? "justify-center" : "gap-2"
+          } rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors`}
+          onClick={handleLogout}
+          title={collapsed ? "Sair" : undefined}
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && <span>Sair</span>}
+        </button>
       </div>
     </div>
   );
