@@ -1,3 +1,4 @@
+// src/components/Sidebar.tsx
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
@@ -14,6 +15,7 @@ import {
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
@@ -30,19 +32,38 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const { role } = useUserRole();
   const [userName, setUserName] = useState<string>("Usuário");
-  const { rows, loading } = useCondominiosDoUsuario();
-  const ids = useMemo(() => rows.map(r => r.condominio_id), [rows]);
-  const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
 
+  // condos do usuário
+  const { rows, loading } = useCondominiosDoUsuario();
+  const ids = useMemo(() => rows.map((r) => r.condominio_id), [rows]);
+  const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
+  const currentCondoName =
+    rows.find((r) => r.condominio_id === current)?.condominios?.nome || "Selecione";
+
+  // grupos de navegação por papel (organizado como nos prints)
   const navigationGroups: NavGroup[] = useMemo(() => {
     if (role === "owner") {
       return [
         {
           label: "Dashboard",
+          items: [{ name: "Painel do Dono", href: "/owner", icon: LayoutDashboard }],
+        },
+        {
+          label: "Operacional",
           items: [
-            { name: "Painel do Dono", href: "/owner", icon: LayoutDashboard },
-            { name: "Condomínios", href: "/owner/condominios", icon: Building2 },
+            { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
+            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
+            { name: "Planos de Manutenção", href: "/preventivas", icon: ClipboardList },
             { name: "Usuários", href: "/owner/usuarios", icon: Users },
+          ],
+        },
+        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
+        {
+          label: "Configurações",
+          items: [
+            { name: "Relatórios", href: "/relatorios", icon: FileText },
+            { name: "Condomínios", href: "/owner/condominios", icon: Building2 },
+            { name: "Configurações", href: "/configuracoes", icon: Settings },
           ],
         },
       ];
@@ -50,83 +71,52 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
     if (role === "admin") {
       return [
-        {
-          label: "Dashboard",
-          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
-        },
+        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
         {
           label: "Operacional",
           items: [
+            { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
+            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
+            { name: "Planos de Manutenção", href: "/preventivas", icon: ClipboardList },
             { name: "Usuários", href: "/usuarios", icon: Users },
             { name: "Relatórios", href: "/relatorios", icon: FileText },
           ],
         },
-        {
-          label: "Ativos",
-          items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }],
-        },
-        {
-          label: "Configurações",
-          items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }],
-        },
+        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
+        { label: "Configurações", items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }] },
       ];
     }
 
     if (role === "sindico") {
       return [
-        {
-          label: "Dashboard",
-          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
-        },
+        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
         {
           label: "Operacional",
           items: [
             { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
             { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
             { name: "Chamados", href: "/chamados", icon: Wrench },
-          ],
-        },
-        {
-          label: "Ativos",
-          items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }],
-        },
-        {
-          label: "Configurações",
-          items: [
             { name: "Relatórios", href: "/relatorios", icon: FileText },
-            { name: "Configurações", href: "/configuracoes", icon: Settings },
           ],
         },
+        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
+        { label: "Configurações", items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }] },
       ];
     }
 
     if (role === "funcionario" || role === "zelador") {
       return [
-        {
-          label: "Dashboard",
-          items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
-        },
-        {
-          label: "Operacional",
-          items: [
-            { name: "Chamados", href: "/chamados", icon: Wrench },
-          ],
-        },
-        {
-          label: "Ativos",
-          items: [{ name: "Ativos", href: "/ativos", icon: Package }],
-        },
+        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
+        { label: "Operacional", items: [{ name: "Chamados", href: "/chamados", icon: Wrench }] },
+        { label: "Ativos", items: [{ name: "Ativos", href: "/ativos", icon: Package }] },
       ];
     }
 
-    return [
-      {
-        label: "Dashboard",
-        items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }],
-      },
-    ];
+    // fallback (usuário sem papel definido)
+    return [{ label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] }];
   }, [role]);
 
+  // carrega nome do usuário (mantido do seu código)
   useEffect(() => {
     (async () => {
       const { data: userResp } = await supabase.auth.getUser();
@@ -150,6 +140,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     })();
   }, []);
 
+  // garante current condominio válido
   useEffect(() => {
     if (!loading) {
       if (!current || (ids.length && !ids.includes(current))) {
@@ -160,14 +151,13 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, ids.join(","), current]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/login");
   }
-
-  const currentCondoName = rows.find(r => r.condominio_id === current)?.condominios?.nome || "Selecione";
 
   return (
     <div
@@ -188,44 +178,16 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navegação por seções */}
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
-          <div key={group.label}>
-            {!collapsed && (
-              <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {group.label}
-              </h3>
-            )}
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  end={item.href === "/"}
-                  className={({ isActive }) =>
-                    `flex items-center ${
-                      collapsed ? "justify-center" : "space-x-3"
-                    } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`
-                  }
-                  title={collapsed ? item.name : undefined}
-                >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
-                  {!collapsed && <span>{item.name}</span>}
-                </NavLink>
-              ))}
-            </div>
-          </div>
+          <Section key={group.label} label={group.label} collapsed={collapsed} items={group.items} />
         ))}
       </nav>
 
-      {/* Footer Section */}
+      {/* Rodapé: seletor de condomínio + usuário + sair */}
       <div className="p-4 border-t space-y-3">
-        {/* Condominium Selector */}
+        {/* Condomínio (não mostra para owner) */}
         {!collapsed && role !== "owner" && (
           <div className="mb-3">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
@@ -252,7 +214,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           </div>
         )}
 
-        {/* User Info */}
+        {/* Usuário */}
         {!collapsed && (
           <div className="mb-3">
             <p className="text-sm font-medium text-foreground">{userName}</p>
@@ -270,7 +232,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           </div>
         )}
 
-        {/* Logout Button */}
+        {/* Sair */}
         <button
           className={`w-full flex items-center ${
             collapsed ? "justify-center" : "gap-2"
@@ -281,6 +243,49 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           <LogOut className="h-4 w-4 flex-shrink-0" />
           {!collapsed && <span>Sair</span>}
         </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  label,
+  items,
+  collapsed,
+}: {
+  label: string;
+  items: NavItem[];
+  collapsed: boolean;
+}) {
+  if (!items.length) return null;
+  return (
+    <div>
+      {!collapsed && (
+        <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {label}
+        </h3>
+      )}
+      <div className="space-y-1">
+        {items.map((item) => (
+          <NavLink
+            key={item.href}
+            to={item.href}
+            end={item.href === "/"}
+            className={({ isActive }) =>
+              `flex items-center ${
+                collapsed ? "justify-center" : "space-x-3"
+              } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              }`
+            }
+            title={collapsed ? item.name : undefined}
+          >
+            <item.icon className="h-5 w-5 flex-shrink-0" />
+            {!collapsed && <span>{item.name}</span>}
+          </NavLink>
+        ))}
       </div>
     </div>
   );
