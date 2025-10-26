@@ -1,19 +1,26 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Navigate } from "react-router-dom";
+import { useUserRole } from "@/hooks/useUserRole";
 
+/**
+ * Componente que restringe acesso apenas para owner (dono do sistema)
+ */
 export default function RequireOwner({ children }: { children: React.ReactNode }) {
-  const [ok, setOk] = useState<null | boolean>(null);
+  const { role, loading } = useUserRole();
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setOk(false); return; }
-      const { data, error } = await supabase.rpc("is_system_owner");
-      setOk(error ? false : !!data);
-    })();
-  }, []);
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Verificando permissões...</p>
+        </div>
+      </div>
+    );
+  }
 
-  if (ok === null) return <div className="p-6">Verificando permissão…</div>;
-  if (!ok) return <div className="p-6 text-red-600">Acesso negado.</div>;
+  if (role !== "owner") {
+    return <Navigate to="/" replace />;
+  }
+
   return <>{children}</>;
 }
