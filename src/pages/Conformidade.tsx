@@ -1,3 +1,4 @@
+// src/pages/Conformidade.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
   listConformidadeItens,
@@ -12,18 +13,22 @@ import {
   listPlanosByAtivo,
   listManutencoesByAtivo,
 } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card, CardContent, CardHeader, CardTitle, CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  CalendarDays, Info, Paperclip, CheckCircle2, ChevronDown, ChevronRight, User, MapPin, Factory, AlertTriangle, ExternalLink,
+  CalendarDays, Info, Paperclip, CheckCircle2, Search, Filter, ChevronDown,
+  Factory, MapPin, AlertTriangle, ExternalLink,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Page } from "@/components/layout/CheckPage";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 
-/* ========= utils ========= */
+/* ================= utils & helpers ================= */
 type Semaforo = "verde" | "amarelo" | "vermelho";
 
 function cls(...a: Array<string | false | null | undefined>) {
@@ -38,11 +43,7 @@ function slugify(s: string) {
     .replace(/^_+|_+$/g, "");
 }
 function titleCase(s: string) {
-  return s
-    .toLowerCase()
-    .split(" ")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
+  return s.toLowerCase().split(" ").map(w => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 }
 function humanizeTipo(raw?: string | null) {
   if (!raw) return "—";
@@ -78,7 +79,7 @@ function compareISO(a: string | null, b: string | null) {
   if (!b) return -1;
   return a.localeCompare(b);
 }
-/** diferença em dias usando 00:00 **local** (não UTC) */
+/** diferença em dias usando 00:00 local */
 function daysUntilLocal(iso?: string | null) {
   if (!iso) return Infinity;
   const target = new Date(iso);
@@ -98,20 +99,16 @@ function isSynthetic(item: any) {
   return String(item?.id || "").startsWith("ativo:");
 }
 
-/* ========= página ========= */
+/* ================ page ================ */
 export default function Conformidade() {
   const [itens, setItens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
+  // filtros da UI “Check”
   const [q, setQ] = useState("");
   const [fTipo, setFTipo] = useState<string>("todos");
-
-  const [openGroup, setOpenGroup] = useState<Record<Semaforo, boolean>>({
-    vermelho: true,
-    amarelo: true,
-    verde: true,
-  });
+  const [ordenar, setOrdenar] = useState<"mais_urgente" | "mais_recente">("mais_urgente");
 
   // modais
   const [open, setOpen] = useState(false);
@@ -122,32 +119,29 @@ export default function Conformidade() {
   const [openRes, setOpenRes] = useState(false);
   const [resItem, setResItem] = useState<any | null>(null);
 
-  // quando o item é sintético, mostramos detalhes do ativo aqui
+  // quando item é sintético (só do ativo)
   const [syntheticPlanos, setSyntheticPlanos] = useState<any[]>([]);
   const [syntheticManuts, setSyntheticManuts] = useState<any[]>([]);
 
   const [tiposDisponiveis, setTiposDisponiveis] = useState<string[]>([]);
 
-  /** Calcula próximo/último/periodicidade a partir de planos+manutenções do ativo */
   async function calcDatasParaAtivo(ativoId: string) {
     const [planos, manuts] = await Promise.all([
       listPlanosByAtivo(ativoId).catch(() => []),
       listManutencoesByAtivo(ativoId).catch(() => []),
     ]);
 
-    // considerar somente tarefas que realmente contam para o próximo
     const STATUS_CONTAM = new Set(["pendente", "agendada", "executando"]);
     const pendentes = (manuts ?? []).filter(
       (m: any) => STATUS_CONTAM.has(m.status) && m.vencimento
     );
-    // 1) preferência: manutenção pendente mais próxima
+
     let proximo =
       pendentes
         .map((m: any) => toISO(m.vencimento))
         .filter(Boolean)
         .sort(compareISO)[0] || null;
 
-    // 2) fallback: próxima execução do plano
     if (!proximo && (planos ?? []).length > 0) {
       const fromPlan = planos
         .map((p: any) => toISO(p.proxima_execucao))
@@ -192,17 +186,15 @@ export default function Conformidade() {
         return info?.is_conf;
       });
 
-      const calcByAtivoId = new Map<
-        string,
-        {
-          proximo: string | null;
-          ultimo: string | null;
-          periodicidade: string | null;
-          status: Semaforo;
-          planos: any[];
-          manuts: any[];
-        }
-      >();
+      const calcByAtivoId = new Map<string, {
+        proximo: string | null;
+        ultimo: string | null;
+        periodicidade: string | null;
+        status: Semaforo;
+        planos: any[];
+        manuts: any[];
+      }>();
+
       await Promise.all(
         ativosElegiveis.map(async (a: any) => {
           const c = await calcDatasParaAtivo(a.id);
@@ -213,7 +205,6 @@ export default function Conformidade() {
       let itensFinais: any[] = [];
 
       if (confItemsRaw.length > 0) {
-        // enriquece com cálculos e força o status correto
         itensFinais = confItemsRaw.map((i: any) => {
           const ativoId = i?.ativo?.id ?? null;
           const calc = ativoId ? calcByAtivoId.get(ativoId) : undefined;
@@ -239,7 +230,6 @@ export default function Conformidade() {
           };
         });
       } else {
-        // fallback sintético com planos/manutenções
         itensFinais = ativosElegiveis.map((a: any) => {
           const info = tipoMap.get(String(a.tipo || "").toLowerCase());
           const confSlug = info?.conf_tipo || slugify(a.tipo || "");
@@ -257,7 +247,6 @@ export default function Conformidade() {
         });
       }
 
-      // filtro de tipos
       const tiposFromItens = new Set<string>();
       itensFinais.forEach((i) => {
         const t = getItemTipo(i);
@@ -270,7 +259,7 @@ export default function Conformidade() {
         humanizeTipo(a).localeCompare(humanizeTipo(b), "pt-BR")
       );
 
-      // ordena por severidade e próximo
+      // ordenação padrão (urgência)
       const ordenado = itensFinais.sort((a, b) => {
         const sev = (s: Semaforo) => (s === "vermelho" ? 0 : s === "amarelo" ? 1 : 2);
         const sv = sev(a.status) - sev(b.status);
@@ -296,30 +285,46 @@ export default function Conformidade() {
   }, []);
 
   const resumo = useMemo(() => {
-    const c = { verde: 0, amarelo: 0, vermelho: 0 } as any;
+    const c = { verde: 0, amarelo: 0, vermelho: 0 };
     itens.forEach((i) => (c[i.status as Semaforo] += 1));
     return c;
   }, [itens]);
 
-  const grouped = useMemo(() => {
-    const base = itens
-      .filter((i) => (fTipo === "todos" ? true : slugify(getItemTipo(i) || "") === fTipo))
-      .filter((i) => {
-        if (!q.trim()) return true;
-        const s = `${getItemTipo(i) ?? ""} ${i.observacoes ?? ""} ${i.ativo?.nome ?? ""} ${i.ativo?.tipo ?? ""} ${i.ativo?.local ?? ""}`.toLowerCase();
-        return s.includes(q.toLowerCase());
-      })
-      .sort((a, b) => (new Date(a.proximo || 0).getTime() - new Date(b.proximo || 0).getTime()));
+  const filtrados = useMemo(() => {
+    let arr = itens.slice();
 
-    const g: Record<Semaforo, any[]> = { vermelho: [], amarelo: [], verde: [] };
-    base.forEach((i) => g[i.status as Semaforo]?.push(i));
-    return g;
-  }, [itens, q, fTipo]);
+    // filtro tipo
+    arr = arr.filter((i) =>
+      fTipo === "todos" ? true : slugify(getItemTipo(i) || "") === fTipo
+    );
+
+    // busca
+    if (q.trim()) {
+      const qq = q.toLowerCase();
+      arr = arr.filter((i) => {
+        const s = `${getItemTipo(i) ?? ""} ${i.observacoes ?? ""} ${i.ativo?.nome ?? ""} ${i.ativo?.tipo ?? ""} ${i.ativo?.local ?? ""}`.toLowerCase();
+        return s.includes(qq);
+      });
+    }
+
+    // ordenar
+    if (ordenar === "mais_urgente") {
+      arr.sort((a, b) => {
+        const sev = (s: Semaforo) => (s === "vermelho" ? 0 : s === "amarelo" ? 1 : 2);
+        const sv = sev(a.status) - sev(b.status);
+        if (sv !== 0) return sv;
+        return compareISO(a.proximo ?? null, b.proximo ?? null);
+      });
+    } else {
+      arr.sort((a, b) => compareISO(b.ultimo ?? null, a.ultimo ?? null));
+    }
+
+    return arr;
+  }, [itens, q, fTipo, ordenar]);
 
   async function openDetails(item: any) {
     setCurrent(item);
 
-    // se for sintético, popula detalhes de ativo (planos/manuts) e não tenta anexos/logs da conformidade
     if (isSynthetic(item) && item?.ativo?.id) {
       const calc = await calcDatasParaAtivo(item.ativo.id);
       setSyntheticPlanos(calc.planos ?? []);
@@ -330,48 +335,42 @@ export default function Conformidade() {
       return;
     }
 
-    // item real (com tabela de conformidade)
     const rows = await listConformidadeAnexos(item.id).catch(() => []);
     const withUrls = await Promise.all(
-      rows.map(async (r: any) => ({ ...r, url: await getSignedUrl("conformidade", r.file_path, 3600).catch(() => "") }))
+      rows.map(async (r: any) => ({
+        ...r,
+        url: await getSignedUrl("conformidade", r.file_path, 3600).catch(() => ""),
+      }))
     );
     setAnexos(withUrls);
 
     const h = await listConformidadeLogs(item.id).catch(() => []);
     setLogs(h);
-
     setOpen(true);
   }
 
   function openResolver(item: any) {
-    // para sintético não existe registro na tabela de conformidade; mandamos para o ativo
     if (isSynthetic(item)) {
-      const id = item?.ativo?.id;
-      if (!id) return;
-      window.location.href = `/ativos?ativo=${encodeURIComponent(id)}&tab=historico`;
+      // sem registro de conformidade — direciona para o ativo
+      if (item?.ativo?.id) {
+        window.location.href = `/ativos?ativo=${encodeURIComponent(item.ativo.id)}&tab=historico`;
+      }
       return;
     }
     setResItem(item);
     setOpenRes(true);
   }
 
-  const searchId = "conf-search";
-  const tipoSelectId = "conf-tipo-select";
-
+  /* ================= render ================= */
   return (
-    <Page>
-      <Page.Header
-        icon={CalendarDays}
-        title="Conformidade Predial"
-        subtitle="Tudo que impacta conformidade, calculado a partir dos planos/manutenções dos ativos."
-        actions={
-          <div className="flex items-center gap-4 text-sm">
-            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.verde)} /> {resumo.verde}</span>
-            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.amarelo)} /> {resumo.amarelo}</span>
-            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.vermelho)} /> {resumo.vermelho}</span>
-          </div>
-        }
-      />
+    <div className="px-6 py-5 max-w-[1200px] mx-auto space-y-6">
+      {/* título + resumo (cards) */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-5 w-5" />
+          <h1 className="text-xl font-semibold">Conformidade Predial</h1>
+        </div>
+      </div>
 
       {erro && (
         <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm">
@@ -383,29 +382,38 @@ export default function Conformidade() {
         </div>
       )}
 
+      <div className="grid gap-3 sm:grid-cols-4">
+        <ResumeCard label="Em dia" value={resumo.verde} color="text-emerald-600" dotClass={dot.verde} />
+        <ResumeCard label="Em breve" value={resumo.amarelo} color="text-amber-600" dotClass={dot.amarelo} />
+        <ResumeCard label="Atrasados" value={resumo.vermelho} color="text-rose-600" dotClass={dot.vermelho} />
+        <ResumeCard label="Total" value={itens.length} color="text-slate-700" />
+      </div>
+
+      {/* filtros compactos */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor={searchId}>Pesquisar</Label>
-              <Input
-                id={searchId}
-                placeholder="tipo, observações, ativo..."
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                name="pesquisar"
-              />
-            </div>
-            <div>
-              <Label htmlFor={tipoSelectId}>Tipo</Label>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Filtros</CardTitle>
+          <CardDescription>Busque por ativo/tipo e refine por categoria e ordenação.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 md:flex-row md:items-end">
+          <div className="relative md:w-1/2">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Buscar por ativo, local, tipo…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 md:ml-auto">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <select
-                id={tipoSelectId}
-                className="border rounded px-3 py-2 w-full"
+                className="border rounded px-3 py-2 text-sm"
                 value={fTipo}
                 onChange={(e) => setFTipo(e.target.value)}
-                name="tipo"
               >
-                <option value="todos">Todos</option>
+                <option value="todos">Todos os tipos</option>
                 {tiposDisponiveis.map((v) => (
                   <option key={v} value={slugify(v)}>
                     {humanizeTipo(v)}
@@ -413,42 +421,33 @@ export default function Conformidade() {
                 ))}
               </select>
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Ordenar</span>
+              <select
+                className="border rounded px-3 py-2 text-sm"
+                value={ordenar}
+                onChange={(e) => setOrdenar(e.target.value as any)}
+              >
+                <option value="mais_urgente">Mais urgente</option>
+                <option value="mais_recente">Último executado</option>
+              </select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <StatusSection
-        titulo="Atrasados"
-        cor="vermelho"
-        itens={grouped.vermelho}
-        open={openGroup.vermelho}
-        setOpen={(v) => setOpenGroup((s) => ({ ...s, vermelho: v }))}
-        onResolver={openResolver}
-        onDetalhes={openDetails}
-        loading={loading}
-      />
-
-      <StatusSection
-        titulo="Vencem em breve"
-        cor="amarelo"
-        itens={grouped.amarelo}
-        open={openGroup.amarelo}
-        setOpen={(v) => setOpenGroup((s) => ({ ...s, amarelo: v }))}
-        onResolver={openResolver}
-        onDetalhes={openDetails}
-        loading={loading}
-      />
-
-      <StatusSection
-        titulo="Em dia"
-        cor="verde"
-        itens={grouped.verde}
-        open={openGroup.verde}
-        setOpen={(v) => setOpenGroup((s) => ({ ...s, verde: v }))}
-        onResolver={openResolver}
-        onDetalhes={openDetails}
-        loading={loading}
-      />
+      {/* lista em cards */}
+      {loading ? (
+        <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando…</CardContent></Card>
+      ) : filtrados.length === 0 ? (
+        <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum item encontrado.</CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {filtrados.map((i) => (
+            <ItemRow key={i.id} item={i} onDetalhes={() => openDetails(i)} onResolver={() => openResolver(i)} />
+          ))}
+        </div>
+      )}
 
       {/* Detalhes */}
       <Dialog open={open} onOpenChange={setOpen}>
@@ -480,17 +479,22 @@ export default function Conformidade() {
                     setCurrent(updated || current);
                     const rows = await listConformidadeAnexos(current.id).catch(() => []);
                     const urls = await Promise.all(
-                      rows.map(async (r: any) => ({ ...r, url: await getSignedUrl("conformidade", r.file_path, 3600).catch(() => "") }))
+                      rows.map(async (r: any) => ({
+                        ...r,
+                        url: await getSignedUrl("conformidade", r.file_path, 3600).catch(() => ""),
+                      }))
                     );
                     setAnexos(urls);
                     const h = await listConformidadeLogs(current.id).catch(() => []);
                     setLogs(h);
                   }
                 }}
-                // dados extras quando sintético
                 planosSynthetic={isSynthetic(current) ? syntheticPlanos : undefined}
                 manutsSynthetic={isSynthetic(current) ? syntheticManuts : undefined}
-                onOpenAtivo={() => current?.ativo?.id && (window.location.href = `/ativos?ativo=${encodeURIComponent(current.ativo.id)}&tab=historico`)}
+                onOpenAtivo={() =>
+                  current?.ativo?.id &&
+                  (window.location.href = `/ativos?ativo=${encodeURIComponent(current.ativo.id)}&tab=historico`)
+                }
               />
             )}
 
@@ -501,16 +505,13 @@ export default function Conformidade() {
         </DialogContent>
       </Dialog>
 
-      {/* Resolver com data (apenas itens reais) */}
+      {/* Resolver */}
       <Dialog open={openRes} onOpenChange={setOpenRes}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirmar resolução</DialogTitle>
-            <DialogDescription>
-              Informe a data em que o item foi executado (pode ter sido ontem ou outro dia).
-            </DialogDescription>
+            <DialogTitle>Confirmar execução</DialogTitle>
+            <DialogDescription>Informe a data de execução.</DialogDescription>
           </DialogHeader>
-
           {resItem && (
             <ResolverBody
               onClose={() => setOpenRes(false)}
@@ -525,103 +526,106 @@ export default function Conformidade() {
           )}
         </DialogContent>
       </Dialog>
-    </Page>
+    </div>
   );
 }
 
-/* ========= Section ========= */
-function StatusSection({
-  titulo, cor, itens, open, setOpen, onResolver, onDetalhes, loading,
-}: {
-  titulo: string;
-  cor: "vermelho" | "amarelo" | "verde";
-  itens: any[];
-  open: boolean;
-  setOpen: (v: boolean) => void;
-  onResolver: (item: any) => void;
-  onDetalhes: (item: any) => Promise<void> | void;
-  loading: boolean;
-}) {
-  const headerColor =
-    cor === "vermelho" ? "bg-rose-50 border-rose-200"
-    : cor === "amarelo" ? "bg-yellow-50 border-yellow-200"
-    : "bg-green-50 border-green-200";
+/* ============== small UI pieces ============== */
 
+function ResumeCard({
+  label, value, color, dotClass,
+}: { label: string; value: number; color?: string; dotClass?: string }) {
   return (
     <Card>
-      <CardHeader className={cls("py-3 border-b", headerColor, "cursor-pointer select-none")} onClick={() => setOpen(!open)}>
-        <CardTitle className="text-base flex items-center gap-2">
-          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          <span className={cls("w-2 h-2 rounded-full", dot[cor])}></span>
-          {titulo} <span className="text-gray-500 font-normal">({itens.length})</span>
-        </CardTitle>
-        <CardDescription className="text-xs">
-          {cor === "vermelho" && "Itens vencidos"}
-          {cor === "amarelo" && "Itens próximos do vencimento (≤ 30 dias)"}
-          {cor === "verde" && "Itens em conformidade"}
-        </CardDescription>
-      </CardHeader>
-
-      {open && (
-        <CardContent className="p-0">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left bg-gray-50 [&>th]:p-2">
-                <th>Tipo</th>
-                <th>Ativo</th>
-                <th>Próximo</th>
-                <th>Último</th>
-                <th>Periodicidade</th>
-                <th>Obs.</th>
-                <th className="text-right pr-3">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.map((i) => (
-                <tr key={i.id} className="border-t">
-                  <td className="p-2 capitalize">{humanizeTipo(getItemTipo(i) || "")}</td>
-                  <td className="p-2">
-                    {i.ativo ? (
-                      <div className="text-xs text-gray-700">
-                        <div className="flex items-center gap-1"><Factory className="w-3.5 h-3.5" /> {i.ativo.nome}</div>
-                        <div className="flex items-center gap-1 text-gray-500"><MapPin className="w-3.5 h-3.5" /> {i.ativo.local ?? "—"}</div>
-                      </div>
-                    ) : "—"}
-                  </td>
-                  <td className="p-2">{i.proximo ? new Date(i.proximo).toLocaleDateString() : "—"}</td>
-                  <td className="p-2">{i.ultimo ? new Date(i.ultimo).toLocaleDateString() : "—"}</td>
-                  <td className="p-2 whitespace-nowrap">{i.periodicidade ?? "—"}</td>
-                  <td className="p-2 truncate max-w-[240px]" title={i.observacoes ?? ""}>
-                    <span className="truncate">{i.observacoes ?? "—"}</span>
-                  </td>
-                  <td className="p-2">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" className="h-8" onClick={() => onResolver(i)} title={String(i?.id || "").startsWith("ativo:") ? "Ir para o ativo para concluir" : "Resolver"}>
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        {String(i?.id || "").startsWith("ativo:") ? "Resolver no ativo" : "Resolver"}
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-8" onClick={() => onDetalhes(i)}>
-                        <Info className="w-4 h-4 mr-1" />
-                        Detalhes
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!loading && itens.length === 0 && (
-                <tr>
-                  <td className="p-6 text-center text-gray-500" colSpan={7}>Sem itens neste grupo.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </CardContent>
-      )}
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">{label}</div>
+          {dotClass ? <span className={cls("w-2 h-2 rounded-full", dotClass)} /> : null}
+        </div>
+        <div className={cls("text-2xl font-bold mt-1", color)}>{value}</div>
+      </CardContent>
     </Card>
   );
 }
 
-/* ========= Detalhes ========= */
+function ItemRow({
+  item,
+  onDetalhes,
+  onResolver,
+}: {
+  item: any;
+  onDetalhes: () => void;
+  onResolver: () => void;
+}) {
+  const s: Semaforo = item.status;
+  const colorBox =
+    s === "vermelho" ? "bg-rose-50 border-rose-200"
+    : s === "amarelo" ? "bg-amber-50 border-amber-200"
+    : "bg-emerald-50 border-emerald-200";
+
+  const next = item.proximo ? new Date(item.proximo).toLocaleDateString() : "—";
+  const last = item.ultimo ? new Date(item.ultimo).toLocaleDateString() : "—";
+  const isSynth = isSynthetic(item);
+
+  return (
+    <Card className={cls("border", colorBox)}>
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          {/* left */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={cls("w-2 h-2 rounded-full", dot[s])} />
+              <div className="font-medium truncate">
+                {item.ativo?.nome ?? humanizeTipo(getItemTipo(item) || "")}
+              </div>
+              <Badge variant="secondary" className="capitalize">
+                {humanizeTipo(getItemTipo(item) || "")}
+              </Badge>
+            </div>
+            {item.ativo ? (
+              <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                <span className="flex items-center gap-1">
+                  <Factory className="w-3.5 h-3.5" /> {item.ativo.nome}
+                </span>
+                {item.ativo.local && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5" /> {item.ativo.local}
+                  </span>
+                )}
+              </div>
+            ) : null}
+          </div>
+
+          {/* middle */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <div className="text-xs text-muted-foreground">Próximo</div>
+              <div className="font-medium">{next}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Último</div>
+              <div className="font-medium">{last}</div>
+            </div>
+          </div>
+
+          {/* actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" onClick={onDetalhes} variant="outline">
+              <Info className="w-4 h-4 mr-1" /> Ver Plano
+            </Button>
+            <Button size="sm" onClick={onResolver}>
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              {isSynth ? "Resolver no ativo" : "Resolver"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ============== Details & Resolver (reuso do seu código) ============== */
+
 function DetailsBody({
   item, anexos, logs, uploading, setUploading, onRefresh,
   planosSynthetic, manutsSynthetic, onOpenAtivo,
@@ -632,7 +636,6 @@ function DetailsBody({
   uploading: boolean;
   setUploading: (v: boolean) => void;
   onRefresh: () => Promise<void>;
-  // extras quando for item sintético
   planosSynthetic?: any[];
   manutsSynthetic?: any[];
   onOpenAtivo?: () => void;
@@ -834,7 +837,6 @@ function DetailsBody({
   );
 }
 
-/* ========= Log ========= */
 function LogRow({ log }: { log: any }) {
   const { acao, created_at, actorName, detalhesParsed, detalhes } = log;
   const [open, setOpen] = useState(false);
@@ -919,9 +921,8 @@ function LogRow({ log }: { log: any }) {
       </div>
 
       <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
-        <User className="w-3.5 h-3.5" />
-        <span className="truncate">{log.actorName ?? "Usuário"}</span>
-        <span>• {fmtDateTime(log.created_at)}</span>
+        <span className="truncate">{actorName ?? "Usuário"}</span>
+        <span>• {fmtDateTime(created_at)}</span>
         <span className="mx-1">•</span>
         <button type="button" onClick={() => setOpen((v) => !v)} className="text-blue-600 hover:underline">
           {open ? "Ocultar detalhes" : "Mostrar detalhes"}
@@ -933,7 +934,6 @@ function LogRow({ log }: { log: any }) {
   );
 }
 
-/* ========= Resolver ========= */
 function ResolverBody({
   onClose, onDone,
 }: {
@@ -954,7 +954,14 @@ function ResolverBody({
     <form onSubmit={confirmar} className="grid gap-4">
       <div className="grid grid-cols-1 gap-2">
         <Label htmlFor={dataId}>Data da execução</Label>
-        <Input id={dataId} type="date" value={dataExec} onChange={(e) => setDataExec(e.target.value)} required max={new Date().toISOString().slice(0, 10)} />
+        <Input
+          id={dataId}
+          type="date"
+          value={dataExec}
+          onChange={(e) => setDataExec(e.target.value)}
+          required
+          max={new Date().toISOString().slice(0, 10)}
+        />
         <p className="text-xs text-gray-500">Se foi ontem (ou outro dia), altere a data antes de confirmar.</p>
       </div>
       <div className="flex items-center justify-end gap-2">
