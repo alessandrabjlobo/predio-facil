@@ -1,78 +1,72 @@
-// src/components/CondominioSwitcher.tsx
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check, ChevronsUpDown, Building2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMeusCondominios } from "@/hooks/useMeusCondominios";
-import { useCondominioAtual } from "@/hooks/useCondominioAtual";
-import { useMemo } from "react";
-// (opcional) se você usa react-query internamente nos hooks
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
-export const CondominioSwitcher = () => {
-  const { lista, isLoading, setPrincipal, isError } = useMeusCondominios();
-  const { condominio } = useCondominioAtual();
-  const queryClient = useQueryClient();
+export function CondominioSwitcher() {
+  const { lista, isLoading, setPrincipal } = useMeusCondominios();
+  const [open, setOpen] = useState(false);
 
-  // id atual: prioriza do contexto; fallback para o marcado como principal na lista
-  const currentId = useMemo(() => {
-    if (condominio?.id) return condominio.id;
-    const principal = (lista || []).find((l: any) => l.is_principal);
-    return principal?.condominio_id ?? principal?.condominios?.id ?? "";
-  }, [condominio?.id, lista]);
-
-  if (isLoading) {
-    return (
-      <div className="min-w-[220px] h-9 inline-flex items-center justify-center text-xs text-muted-foreground">
-        Carregando…
-      </div>
-    );
-  }
-
-  if (isError || !lista || lista.length === 0) {
-    return (
-      <div className="min-w-[220px] h-9 inline-flex items-center justify-center text-xs text-red-600">
-        Erro ao carregar condomínios
-      </div>
-    );
-  }
-
-  const onlyOne = lista.length === 1;
+  const principal = lista?.find((c: any) => c.is_principal);
+  const condominioAtual = principal?.condominios;
 
   return (
-    <div className="min-w-[220px]">
-      <Select
-        value={currentId || undefined}
-        onValueChange={(value) => {
-          // Atualiza o principal no backend
-          setPrincipal.mutate(value, {
-            onSuccess: async () => {
-              // ❗️OPÇÃO A (recomendada): invalidar caches que dependem do condomínio
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["meus-condominios"] }),
-                queryClient.invalidateQueries({ queryKey: ["condominio-atual"] }),
-                queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-                queryClient.invalidateQueries({ queryKey: ["os"] }),
-                queryClient.invalidateQueries({ queryKey: ["ativos"] }),
-                queryClient.invalidateQueries({ queryKey: ["manutencoes"] }),
-              ]);
-
-              // Se o seu useCondominioAtual não re-lê sozinho o principal,
-              // você pode forçar um refresh suave:
-              // window.location.reload();
-            },
-          });
-        }}
-        disabled={onlyOne}
-      >
-        <SelectTrigger className="h-9 text-sm">
-          <SelectValue placeholder="Selecionar condomínio" />
-        </SelectTrigger>
-        <SelectContent>
-          {lista.map((item: any) => (
-            <SelectItem key={item.condominio_id} value={item.condominio_id}>
-              {item.condominios?.nome || "Condomínio"}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            {isLoading ? (
+              "Carregando..."
+            ) : condominioAtual ? (
+              condominioAtual.nome
+            ) : (
+              "Selecione um condomínio"
+            )}
+          </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0">
+        <Command>
+          <CommandInput placeholder="Buscar condomínio..." />
+          <CommandEmpty>Nenhum condomínio encontrado.</CommandEmpty>
+          <CommandGroup>
+            {lista?.map((item: any) => (
+              <CommandItem
+                key={item.condominio_id}
+                value={item.condominios?.nome}
+                onSelect={() => {
+                  setPrincipal.mutate(item.condominio_id);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    item.is_principal ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                {item.condominios?.nome}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
-};
+}
