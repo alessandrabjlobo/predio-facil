@@ -1,3 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { ExecStatus } from "@/lib/types";
+
 export function useManutencoes(filters?: {
   status?: ExecStatus;
   ativo_id?: string;
@@ -5,6 +9,29 @@ export function useManutencoes(filters?: {
 }) {
   return useQuery({
     queryKey: ['manutencoes', filters],
-    queryFn: () => listManutencoes(filters),
+    queryFn: async () => {
+      let query = supabase
+        .from("manutencoes")
+        .select(`
+          *,
+          ativos(id, nome, tipo_id),
+          planos_manutencao(id, titulo)
+        `)
+        .order("vencimento", { ascending: true });
+
+      if (filters?.status) {
+        query = query.eq("status", filters.status);
+      }
+      if (filters?.ativo_id) {
+        query = query.eq("ativo_id", filters.ativo_id);
+      }
+      if (filters?.condominio_id) {
+        query = query.eq("condominio_id", filters.condominio_id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
   });
 }
