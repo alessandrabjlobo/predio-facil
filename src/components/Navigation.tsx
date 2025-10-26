@@ -1,4 +1,18 @@
-import { Home, Calendar, MessageSquare, ClipboardList, Clock, Package, ShoppingBag, FileText, Shield, Settings, Users, LayoutDashboard, Wrench, Building2, ClipboardCheck, LogOut } from "lucide-react";
+import {
+  Home,
+  Calendar,
+  MessageSquare,
+  ClipboardList,
+  Clock,
+  Package,
+  ShoppingBag,
+  FileText,
+  Shield,
+  Settings,
+  Users,
+  Building2,
+  LogOut,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -16,7 +30,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   const location = useLocation();
   const { signOut } = useAuth();
   const { role } = useUserRole();
-  
+
   const isOnIndexPage = location.pathname === "/";
 
   const tabs = [
@@ -32,14 +46,14 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
     { id: "relatorios", label: "Relatórios", icon: FileText, route: "/relatorios" },
     { id: "conformidade", label: "Conformidade", icon: Shield, route: "/conformidade" },
     { id: "configuracoes", label: "Configurações", icon: Settings, route: "/configuracoes" },
-    ...(role === 'admin' ? [{ id: "admin", label: "Admin", icon: Users, route: "/dashboard/admin" }] : []),
+    ...(role === "admin" ? [{ id: "admin", label: "Admin", icon: Users, route: "/dashboard/admin" }] : []),
   ];
-
 
   const handleLogout = async () => {
     await signOut();
     toast.success("Logout realizado com sucesso!");
-    navigate("/auth");
+    // ✅ corrige para /login
+    navigate("/login");
   };
 
   return (
@@ -53,7 +67,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
               <p className="text-xs text-muted-foreground">Gestão de Manutenções</p>
             </div>
           </div>
-          
+
           <div className="flex gap-2 items-center">
             <CondominioSwitcher />
             {tabs.map((tab) => {
@@ -88,11 +102,7 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
                 <span className="hidden sm:inline">Admin</span>
               </Button>
             )}
-            <Button
-              variant="ghost"
-              onClick={handleLogout}
-              className="gap-2"
-            >
+            <Button variant="ghost" onClick={handleLogout} className="gap-2">
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Sair</span>
             </Button>
