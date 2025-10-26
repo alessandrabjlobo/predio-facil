@@ -1,3 +1,4 @@
+// FILE: src/pages/AdminMaster.tsx
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
 import { KPICards } from "@/components/patterns/KPICards";
@@ -16,14 +17,13 @@ import {
 } from "lucide-react";
 import { useCondominios } from "@/hooks/useCondominios";
 import { useUsuarios } from "@/hooks/useUsuarios";
-
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
@@ -43,7 +43,7 @@ type CondoForm = {
   cnpj?: string;
   cidade?: string;
   uf?: string;
-  sindico_id?: string; // usuário já cadastrado
+  sindico_id?: string;
 };
 
 export default function AdminMaster() {
@@ -55,7 +55,7 @@ export default function AdminMaster() {
     createCondominio,
     updateCondominio,
     deleteCondominio,
-    assignSindico,
+    // assignSindico,  // ❌ não precisa mais — create já aceita sindico_id
   } = useCondominios();
 
   const {
@@ -65,7 +65,6 @@ export default function AdminMaster() {
     deleteUsuario,
   } = useUsuarios();
 
-  // KPIs
   const totalCondominios = condominios?.length || 0;
   const totalUsuarios = usuarios?.length || 0;
   const totalSindicos = (usuarios || []).filter(
@@ -79,7 +78,6 @@ export default function AdminMaster() {
     { label: "Conformidades Críticas", value: 0, icon: Settings },
   ];
 
-  // Filtros
   const [qConds, setQConds] = useState("");
   const [qUsers, setQUsers] = useState("");
 
@@ -105,7 +103,6 @@ export default function AdminMaster() {
     });
   }, [usuarios, qUsers]);
 
-  // ====== Modais ======
   const [openNewCondo, setOpenNewCondo] = useState(false);
   const [openEditCondo, setOpenEditCondo] = useState<CondoForm | null>(null);
   const [openEditUser, setOpenEditUser] = useState<any | null>(null);
@@ -136,6 +133,7 @@ export default function AdminMaster() {
     e.preventDefault();
     if (!condoForm.nome.trim()) return;
 
+    // ✅ passa sindico_id direto pro hook createCondominio
     const payload = {
       nome: condoForm.nome.trim(),
       endereco: condoForm.endereco?.trim() || null,
@@ -146,10 +144,7 @@ export default function AdminMaster() {
       sindico_id: condoForm.sindico_id || null,
     };
 
-    const created: any = await createCondominio.mutateAsync(payload);
-
-    // se não quisermos que o hook faça a vinculação, poderíamos chamar assignSindico aqui.
-    // como o hook já lida com sindico_id (ver arquivo do hook abaixo), não precisa.
+    await createCondominio.mutateAsync(payload);
 
     setOpenNewCondo(false);
     resetCondoForm();
@@ -161,6 +156,8 @@ export default function AdminMaster() {
 
     await updateCondominio.mutateAsync({
       id: openEditCondo.id,
+      // OBS: se o tipo do hook ainda não inclui cidade/uf, adicione lá.
+      // Temporariamente, você pode usar `as any` no patch.
       patch: {
         nome: openEditCondo.nome.trim(),
         endereco: openEditCondo.endereco?.trim() || null,
@@ -168,18 +165,17 @@ export default function AdminMaster() {
         cnpj: openEditCondo.cnpj?.trim() || null,
         cidade: openEditCondo.cidade?.trim() || null,
         uf: openEditCondo.uf?.trim() || null,
-      },
+      } as any,
     });
 
     setOpenEditCondo(null);
   }
 
-  // ====== Render ======
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
         title="Painel Administrativo"
-        subtitle="Visão de negócio: condomínios, usuários e engajamento"
+        subtitle="Gerencie condomínios, síndicos, usuários e templates de manutenção"
         actions={
           <>
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -420,8 +416,8 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo Condomínio</DialogTitle>
-            <DialogDescription className="sr-only">
-              Preencha os dados abaixo para criar um novo condomínio.
+            <DialogDescription>
+              Preencha os dados do condomínio e, opcionalmente, selecione um síndico já cadastrado.
             </DialogDescription>
           </DialogHeader>
           <form className="grid gap-3" onSubmit={handleCreateCondo}>
@@ -532,8 +528,8 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Condomínio</DialogTitle>
-            <DialogDescription className="sr-only">
-              Edite os dados e salve para atualizar o condomínio.
+            <DialogDescription>
+              Atualize os dados do condomínio conforme necessário.
             </DialogDescription>
           </DialogHeader>
 
@@ -622,8 +618,8 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
-            <DialogDescription className="sr-only">
-              Atualize os dados do usuário.
+            <DialogDescription>
+              Atualize o nome e papel do usuário no sistema.
             </DialogDescription>
           </DialogHeader>
 
@@ -636,6 +632,7 @@ export default function AdminMaster() {
                   id: openEditUser.id,
                   patch: {
                     nome: openEditUser.nome || null,
+                    email: openEditUser.email || null,
                     papel: openEditUser.papel || null,
                   },
                 });
