@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -37,13 +49,13 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
   const [descricao, setDescricao] = useState("");
   const [tipo, setTipo] = useState(initialData?.tipo || "preventiva");
   const [prioridade, setPrioridade] = useState("media");
-  const [ativoId, setAtivoId] = useState(initialData?.ativoId || "");
+  const [ativoId, setAtivoId] = useState(initialData?.ativoId || ""); // manter como string
   const [dataPrevista, setDataPrevista] = useState<Date | undefined>(
     initialData?.dataPrevista ? new Date(initialData.dataPrevista) : undefined
   );
   const [slaDias, setSlaDias] = useState("30");
   const [tipoExecutor, setTipoExecutor] = useState<"interno" | "externo">("interno");
-  const [executanteId, setExecutanteId] = useState("");
+  const [executanteId, setExecutanteId] = useState(""); // string
   const [executorNome, setExecutorNome] = useState("");
   const [executorContato, setExecutorContato] = useState("");
   const [executorEmpresa, setExecutorEmpresa] = useState("");
@@ -51,30 +63,30 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
   const [custoPrevisto, setCustoPrevisto] = useState("");
 
   const handleSubmit = async () => {
-    if (!titulo || !ativoId) {
-      return;
-    }
+    if (!titulo || !ativoId) return;
 
-    const ativo = ativos?.find(a => a.id === ativoId);
+    // comparar ids como string pra evitar bugs entre number/string
+    const ativo = ativos?.find((a: any) => String(a.id) === String(ativoId));
 
-  await createOS.mutateAsync({
-  titulo,
-  descricao,
-  ativoId,
-  planoId: initialData?.planoId,
-  tipo,
-  prioridade,
-  dataPrevista: dataPrevista?.toISOString().split('T')[0],
-  slaDias: parseInt(slaDias),
-  tipoExecutor,
-  executanteId: tipoExecutor === "interno" ? executanteId : undefined,
-  executorNome: tipoExecutor === "externo" ? executorNome : undefined,
-  executorContato: tipoExecutor === "externo" ? executorContato : undefined,
-  executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
-  executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
-  custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
-});
-
+    // UMA ÚNICA chamada ao mutateAsync (antes tinham duas)
+    await createOS.mutateAsync({
+      titulo,
+      descricao,
+      ativoId, // string
+      planoId: initialData?.planoId,
+      tipo,
+      prioridade,
+      dataPrevista: dataPrevista?.toISOString().split("T")[0],
+      slaDias: parseInt(slaDias || "0", 10),
+      local: ativo?.local, // mantém local se existir
+      tipoExecutor,
+      executanteId: tipoExecutor === "interno" ? executanteId : undefined,
+      executorNome: tipoExecutor === "externo" ? executorNome : undefined,
+      executorContato: tipoExecutor === "externo" ? executorContato : undefined,
+      executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
+      executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
+      custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
+    });
 
     onOpenChange(false);
     resetForm();
@@ -159,13 +171,13 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
 
           <div>
             <Label htmlFor="ativo">Ativo *</Label>
-            <Select value={ativoId} onValueChange={setAtivoId}>
+            <Select value={ativoId} onValueChange={(v) => setAtivoId(String(v))}>
               <SelectTrigger id="ativo">
                 <SelectValue placeholder="Selecione o ativo" />
               </SelectTrigger>
               <SelectContent>
-                {ativos?.map((ativo) => (
-                  <SelectItem key={ativo.id} value={ativo.id}>
+                {ativos?.map((ativo: any, idx: number) => (
+                  <SelectItem key={`${ativo.id}-${idx}`} value={String(ativo.id)}>
                     {ativo.nome} {ativo.local && `- ${ativo.local}`}
                   </SelectItem>
                 ))}
@@ -190,12 +202,7 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dataPrevista}
-                    onSelect={setDataPrevista}
-                    initialFocus
-                  />
+                  <Calendar mode="single" selected={dataPrevista} onSelect={setDataPrevista} initialFocus />
                 </PopoverContent>
               </Popover>
             </div>
@@ -226,7 +233,10 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
 
           <div className="space-y-3 border-t pt-4">
             <Label>Tipo de Executor *</Label>
-            <RadioGroup value={tipoExecutor} onValueChange={(v) => setTipoExecutor(v as "interno" | "externo")}>
+            <RadioGroup
+              value={tipoExecutor}
+              onValueChange={(v) => setTipoExecutor(v as "interno" | "externo")}
+            >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="interno" id="interno" />
                 <Label htmlFor="interno" className="font-normal cursor-pointer">
@@ -245,14 +255,14 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
           {tipoExecutor === "interno" ? (
             <div>
               <Label htmlFor="executante">Executante *</Label>
-              <Select value={executanteId} onValueChange={setExecutanteId}>
+              <Select value={executanteId} onValueChange={(v) => setExecutanteId(String(v))}>
                 <SelectTrigger id="executante">
                   <SelectValue placeholder="Selecione o responsável" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zeladores?.map((zelador: any) => (
-                    <SelectItem key={zelador.id} value={zelador.id}>
-                      {zelador.nome}
+                  {zeladores?.map((z: any, idx: number) => (
+                    <SelectItem key={`${z.id}-${idx}`} value={String(z.id)}>
+                      {z.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
