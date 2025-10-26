@@ -17,16 +17,15 @@ export default function TenantIndex() {
 
   switch (role) {
     case "owner":
-      return <Navigate to="/owner" replace />;
+      return <Navigate to="/admin" replace />;
     case "sindico":
-      return <Navigate to="/dashboard/sindico" replace />;
     case "admin":
-      return <Navigate to="/dashboard/admin" replace />;
+      return <Navigate to="/dashboard/sindico" replace />;
     case "funcionario":
     case "zelador":
-      return <Navigate to="/dashboard/funcionario" replace />;
+      return <Navigate to="/dashboard/sindico" replace />;
     case "fornecedor":
-      return <Navigate to="/dashboard/fornecedor" replace />;
+      return <Navigate to="/dashboard/sindico" replace />;
     default:
       return <Navigate to="/dashboard/sindico" replace />;
   }
