@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useUserRole } from "@/hooks/useUserRole";
 import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
 import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 
