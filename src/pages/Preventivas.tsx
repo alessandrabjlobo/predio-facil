@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { listUpcomingManutencoes } from "@/lib/api";
+import { Page } from "@/components/layout/CheckPage";
 
-// Tipos locais (ajuste se seus tipos exportados já existirem)
 type ExecStatus = "pendente" | "agendada" | "executando" | "concluida" | "cancelada";
 type Manut = {
   id: string;
@@ -38,14 +38,13 @@ export default function Preventivas() {
   const [itens, setItens] = useState<Manut[]>([]);
   const [q, setQ] = useState("");
 
-  // filtros simples via querystring (ex.: /preventivas?range=30&status=pendente)
-  const range = Number(params.get("range") || 30); // dias à frente
+  const range = Number(params.get("range") || 30);
   const statusQS = (params.get("status") as ExecStatus | null) || null;
 
   async function fetchData() {
     setLoading(true);
     try {
-      const data = (await listUpcomingManutencoes(200)) as Manut[]; // busca “mais” e filtramos aqui
+      const data = (await listUpcomingManutencoes(200)) as Manut[];
       setItens(data || []);
     } finally {
       setLoading(false);
@@ -63,14 +62,11 @@ export default function Preventivas() {
 
     return itens
       .filter((m) => {
-        // por data (até o range)
         if (m.vencimento) {
           const d = new Date(m.vencimento);
           if (d > max) return false;
         }
-        // por status
         if (statusQS && m.status !== statusQS) return false;
-        // por busca
         const txt = `${m.titulo ?? ""} ${m.ativo_nome ?? ""}`.toLowerCase();
         if (q.trim() && !txt.includes(q.trim().toLowerCase())) return false;
 
@@ -84,24 +80,23 @@ export default function Preventivas() {
   }, [itens, q, range, statusQS]);
 
   return (
-    <div className="px-6 py-5 max-w-[1200px] mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-5 w-5" />
-          <h1 className="text-xl font-semibold">Manutenções Preventivas</h1>
-        </div>
-        <div className="flex gap-2">
+    <Page>
+      <Page.Header
+        icon={CalendarDays}
+        title="Manutenções Preventivas"
+        subtitle="Filtre por status, horizonte de dias e busque por título/ativo."
+        actions={
           <Button variant="outline" size="sm" onClick={fetchData}>
             <RefreshCcw className={cls("h-4 w-4 mr-2", loading && "animate-spin")} />
             Atualizar
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Próximas programações</CardTitle>
-          <CardDescription>Filtre por status, horizonte de dias e busque por título/ativo.</CardDescription>
+          <CardDescription>Visualização em lista com destaque para vencimentos.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Filtros */}
@@ -223,6 +218,6 @@ export default function Preventivas() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </Page>
   );
 }
