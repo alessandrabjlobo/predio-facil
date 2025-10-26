@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   Building2,
@@ -36,6 +36,7 @@ const uniqueById = <T extends { condominio_id?: any; id?: any }>(arr: T[]) => {
 
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { role } = useUserRole();
   const [userName, setUserName] = useState<string>("Usuário");
 
@@ -257,7 +258,7 @@ function Section({
           <NavLink
             key={item.href}
             to={item.href}
-            end={item.href === "/"}
+            end={item.href === "/" || item.href === "/admin"}
             className={({ isActive }) =>
               `flex items-center ${
                 collapsed ? "justify-center" : "space-x-3"
