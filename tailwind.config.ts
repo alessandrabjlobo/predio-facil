@@ -1,4 +1,3 @@
-// tailwind.config.ts
 import type { Config } from "tailwindcss";
 
 export default {
@@ -25,16 +24,16 @@ export default {
         foreground: "hsl(var(--foreground))",
 
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-          hover: "hsl(var(--primary-hover))",
+          DEFAULT: "hsl(200, 70%, 45%)", // azul-petróleo
+          foreground: "hsl(0, 0%, 100%)",
+          hover: "hsl(200, 70%, 40%)",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: "hsl(var(--destructive))",
+          DEFAULT: "hsl(0, 84%, 60%)",
           foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
@@ -47,12 +46,16 @@ export default {
           hover: "hsl(var(--accent-hover))",
         },
         success: {
-          DEFAULT: "hsl(var(--success))",
-          foreground: "hsl(var(--success-foreground))",
+          DEFAULT: "hsl(142, 71%, 45%)", // verde
+          foreground: "hsl(0, 0%, 100%)",
         },
         warning: {
-          DEFAULT: "hsl(var(--warning))",
-          foreground: "hsl(var(--warning-foreground))",
+          DEFAULT: "hsl(38, 92%, 50%)", // âmbar
+          foreground: "hsl(0, 0%, 0%)",
+        },
+        danger: {
+          DEFAULT: "hsl(0, 84%, 60%)", // vermelho
+          foreground: "hsl(0, 0%, 100%)",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -72,11 +75,12 @@ export default {
       boxShadow: {
         card: "var(--shadow-card)",
         "card-hover": "var(--shadow-hover)",
-        soft: "0 10px 25px -10px rgba(0,0,0,0.12)", // extra estilo CHECK
+        soft: "0 2px 8px rgba(0,0,0,0.08)",
       },
 
       borderRadius: {
-        lg: "var(--radius)",                 // 14px (ajustável via CSS var)
+        "2xl": "16px",
+        lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
