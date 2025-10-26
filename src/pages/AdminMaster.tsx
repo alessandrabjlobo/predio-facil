@@ -1,4 +1,3 @@
-// FILE: src/pages/AdminMaster.tsx
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
 import { KPICards } from "@/components/patterns/KPICards";
@@ -12,10 +11,21 @@ import {
   Settings,
   Download,
   PlusCircle,
+  Edit3,
+  Trash2,
 } from "lucide-react";
-
 import { useCondominios } from "@/hooks/useCondominios";
 import { useUsuarios } from "@/hooks/useUsuarios";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select"; // se não tiver, substitua por <select> nativo
 
 function Empty({ text }: { text: string }) {
   return (
@@ -25,17 +35,35 @@ function Empty({ text }: { text: string }) {
   );
 }
 
+type CondoForm = {
+  id?: string;
+  nome: string;
+  endereco?: string;
+  unidades?: string;
+  cnpj?: string;
+  cidade?: string;
+  uf?: string;
+  sindico_id?: string; // usuário já cadastrado
+};
+
 export default function AdminMaster() {
   const [activeTab, setActiveTab] = useState("condominios");
 
-  // Hooks de dados
   const {
     condominios,
     isLoading: condominiosLoading,
-    createCondominio, // mutate
+    createCondominio,
+    updateCondominio,
+    deleteCondominio,
+    assignSindico,
   } = useCondominios();
 
-  const { usuarios, isLoading: usuariosLoading } = useUsuarios();
+  const {
+    usuarios,
+    isLoading: usuariosLoading,
+    updateUsuario,
+    deleteUsuario,
+  } = useUsuarios();
 
   // KPIs
   const totalCondominios = condominios?.length || 0;
@@ -51,7 +79,7 @@ export default function AdminMaster() {
     { label: "Conformidades Críticas", value: 0, icon: Settings },
   ];
 
-  // Filtros locais
+  // Filtros
   const [qConds, setQConds] = useState("");
   const [qUsers, setQUsers] = useState("");
 
@@ -77,6 +105,83 @@ export default function AdminMaster() {
     });
   }, [usuarios, qUsers]);
 
+  // ====== Modais ======
+  const [openNewCondo, setOpenNewCondo] = useState(false);
+  const [openEditCondo, setOpenEditCondo] = useState<CondoForm | null>(null);
+  const [openEditUser, setOpenEditUser] = useState<any | null>(null);
+
+  const [condoForm, setCondoForm] = useState<CondoForm>({
+    nome: "",
+    endereco: "",
+    unidades: "",
+    cnpj: "",
+    cidade: "",
+    uf: "",
+    sindico_id: "",
+  });
+
+  function resetCondoForm() {
+    setCondoForm({
+      nome: "",
+      endereco: "",
+      unidades: "",
+      cnpj: "",
+      cidade: "",
+      uf: "",
+      sindico_id: "",
+    });
+  }
+
+  async function handleCreateCondo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!condoForm.nome.trim()) return;
+
+    const payload = {
+      nome: condoForm.nome.trim(),
+      endereco: condoForm.endereco?.trim() || null,
+      unidades: condoForm.unidades ? Number(condoForm.unidades) : null,
+      cnpj: condoForm.cnpj?.trim() || null,
+      cidade: condoForm.cidade?.trim() || null,
+      uf: condoForm.uf?.trim() || null,
+    };
+
+    const created: any = await createCondominio.mutateAsync(payload);
+
+    // vincula síndico, se escolhido
+    if (condoForm.sindico_id) {
+      try {
+        await assignSindico.mutateAsync({
+          usuario_id: condoForm.sindico_id,
+          condominio_id: created.id,
+          is_principal: true,
+        });
+      } catch {
+        // só loga; o cadastro do condomínio já foi feito
+      }
+    }
+
+    setOpenNewCondo(false);
+    resetCondoForm();
+  }
+
+  async function handleUpdateCondo(e: React.FormEvent) {
+    e.preventDefault();
+    if (!openEditCondo?.id || !openEditCondo.nome.trim()) return;
+
+    await updateCondominio.mutateAsync({
+      id: openEditCondo.id,
+      nome: openEditCondo.nome.trim(),
+      endereco: openEditCondo.endereco?.trim() || null,
+      unidades: openEditCondo.unidades ? Number(openEditCondo.unidades) : null,
+      cnpj: openEditCondo.cnpj?.trim() || null,
+      cidade: openEditCondo.cidade?.trim() || null,
+      uf: openEditCondo.uf?.trim() || null,
+    });
+
+    setOpenEditCondo(null);
+  }
+
+  // ====== Render ======
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
@@ -88,17 +193,7 @@ export default function AdminMaster() {
               <Download className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
-            <Button
-              onClick={async () => {
-                const nome = prompt("Nome do novo condomínio:");
-                if (!nome) return;
-                try {
-                  await createCondominio.mutateAsync({ nome });
-                } catch (e: any) {
-                  alert(e?.message || "Falha ao criar condomínio");
-                }
-              }}
-            >
+            <Button onClick={() => setOpenNewCondo(true)}>
               <PlusCircle className="h-4 w-4 mr-2" />
               Novo Condomínio
             </Button>
@@ -144,26 +239,28 @@ export default function AdminMaster() {
                 <tr className="[&>th]:p-2 text-left">
                   <th>Nome</th>
                   <th>Endereço</th>
+                  <th>Unidades</th>
                   <th>Síndico(s)</th>
                   <th>ID</th>
+                  <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {condominiosLoading ? (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={6}>
                       <Empty text="Carregando…" />
                     </td>
                   </tr>
                 ) : condsFiltered.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={6}>
                       <Empty text="Nenhum condomínio encontrado." />
                     </td>
                   </tr>
                 ) : (
                   condsFiltered.map((c: any) => (
-                    <tr key={c.id} className="border-t [&>td]:p-2">
+                    <tr key={c.id} className="border-t [&>td]:p-2 align-middle">
                       <td>
                         <a
                           className="text-primary hover:underline"
@@ -173,6 +270,7 @@ export default function AdminMaster() {
                         </a>
                       </td>
                       <td>{c.endereco ?? "—"}</td>
+                      <td>{c.unidades ?? "—"}</td>
                       <td className="text-xs">
                         {(c.usuarios_condominios ?? [])
                           .filter(
@@ -186,6 +284,42 @@ export default function AdminMaster() {
                           .join(", ") || "—"}
                       </td>
                       <td className="text-xs text-muted-foreground">{c.id}</td>
+                      <td className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setOpenEditCondo({
+                                id: c.id,
+                                nome: c.nome ?? "",
+                                endereco: c.endereco ?? "",
+                                unidades: c.unidades ?? "",
+                                cnpj: c.cnpj ?? "",
+                                cidade: c.cidade ?? "",
+                                uf: c.uf ?? "",
+                              })
+                            }
+                          >
+                            <Edit3 className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={async () => {
+                              const ok = window.confirm(
+                                "Excluir este condomínio? Essa ação não pode ser desfeita."
+                              );
+                              if (!ok) return;
+                              await deleteCondominio.mutateAsync(c.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Excluir
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -216,24 +350,25 @@ export default function AdminMaster() {
                   <th>Email</th>
                   <th>Papel</th>
                   <th>Criado em</th>
+                  <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {usuariosLoading ? (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <Empty text="Carregando…" />
                     </td>
                   </tr>
                 ) : usersFiltered.length === 0 ? (
                   <tr>
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       <Empty text="Nenhum usuário encontrado." />
                     </td>
                   </tr>
                 ) : (
                   usersFiltered.map((u: any) => (
-                    <tr key={u.id} className="border-t [&>td]:p-2">
+                    <tr key={u.id} className="border-t [&>td]:p-2 align-middle">
                       <td>{u.nome ?? "—"}</td>
                       <td>{u.email ?? "—"}</td>
                       <td className="capitalize">{u.papel ?? "—"}</td>
@@ -241,6 +376,32 @@ export default function AdminMaster() {
                         {u.created_at
                           ? new Date(u.created_at).toLocaleString()
                           : "—"}
+                      </td>
+                      <td className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setOpenEditUser(u)}
+                          >
+                            <Edit3 className="h-4 w-4 mr-1" />
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={async () => {
+                              const ok = window.confirm(
+                                "Excluir este usuário? (Isso NÃO remove a conta de autenticação)."
+                              );
+                              if (!ok) return;
+                              await deleteUsuario.mutateAsync(u.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Excluir
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -260,6 +421,266 @@ export default function AdminMaster() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* MODAL: Novo Condomínio */}
+      <Dialog open={openNewCondo} onOpenChange={setOpenNewCondo}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Condomínio</DialogTitle>
+          </DialogHeader>
+          <form
+            className="grid gap-3"
+            onSubmit={handleCreateCondo}
+          >
+            <div>
+              <Label>Nome *</Label>
+              <Input
+                required
+                value={condoForm.nome}
+                onChange={(e) =>
+                  setCondoForm((s) => ({ ...s, nome: e.target.value }))
+                }
+              />
+            </div>
+
+            <div>
+              <Label>Endereço</Label>
+              <Input
+                value={condoForm.endereco}
+                onChange={(e) =>
+                  setCondoForm((s) => ({ ...s, endereco: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Unidades</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={condoForm.unidades}
+                  onChange={(e) =>
+                    setCondoForm((s) => ({ ...s, unidades: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <Label>CNPJ</Label>
+                <Input
+                  value={condoForm.cnpj}
+                  onChange={(e) =>
+                    setCondoForm((s) => ({ ...s, cnpj: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Cidade</Label>
+                <Input
+                  value={condoForm.cidade}
+                  onChange={(e) =>
+                    setCondoForm((s) => ({ ...s, cidade: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <Label>UF</Label>
+                <Input
+                  value={condoForm.uf}
+                  onChange={(e) =>
+                    setCondoForm((s) => ({ ...s, uf: e.target.value.toUpperCase() }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Síndico (já cadastrado)</Label>
+              {/* Se não usa um Select pronto, troque por <select> nativo */}
+              <select
+                className="border rounded px-3 py-2 w-full"
+                value={condoForm.sindico_id}
+                onChange={(e) =>
+                  setCondoForm((s) => ({ ...s, sindico_id: e.target.value }))
+                }
+              >
+                <option value="">— selecionar —</option>
+                {(usuarios || []).map((u: any) => (
+                  <option key={u.id} value={u.id}>
+                    {u.nome || u.email} {u.papel ? `(${u.papel})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpenNewCondo(false);
+                  resetCondoForm();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createCondominio.isPending}>
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: Editar Condomínio */}
+      <Dialog open={!!openEditCondo} onOpenChange={(v) => !v && setOpenEditCondo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Condomínio</DialogTitle>
+          </DialogHeader>
+
+          {openEditCondo && (
+            <form className="grid gap-3" onSubmit={handleUpdateCondo}>
+              <div>
+                <Label>Nome *</Label>
+                <Input
+                  required
+                  value={openEditCondo.nome}
+                  onChange={(e) =>
+                    setOpenEditCondo((s) => s && ({ ...s, nome: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Endereço</Label>
+                <Input
+                  value={openEditCondo.endereco}
+                  onChange={(e) =>
+                    setOpenEditCondo((s) => s && ({ ...s, endereco: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Unidades</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={openEditCondo.unidades}
+                    onChange={(e) =>
+                      setOpenEditCondo((s) => s && ({ ...s, unidades: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>CNPJ</Label>
+                  <Input
+                    value={openEditCondo.cnpj}
+                    onChange={(e) =>
+                      setOpenEditCondo((s) => s && ({ ...s, cnpj: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Cidade</Label>
+                  <Input
+                    value={openEditCondo.cidade}
+                    onChange={(e) =>
+                      setOpenEditCondo((s) => s && ({ ...s, cidade: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>UF</Label>
+                  <Input
+                    value={openEditCondo.uf}
+                    onChange={(e) =>
+                      setOpenEditCondo((s) => s && ({ ...s, uf: e.target.value.toUpperCase() }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-2">
+                <Button type="button" variant="outline" onClick={() => setOpenEditCondo(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateCondominio.isPending}>
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: Editar Usuário */}
+      <Dialog open={!!openEditUser} onOpenChange={(v) => !v && setOpenEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+          </DialogHeader>
+
+          {openEditUser && (
+            <form
+              className="grid gap-3"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await updateUsuario.mutateAsync({
+                  id: openEditUser.id,
+                  nome: openEditUser.nome || null,
+                  papel: openEditUser.papel || null,
+                });
+                setOpenEditUser(null);
+              }}
+            >
+              <div>
+                <Label>Nome</Label>
+                <Input
+                  value={openEditUser.nome ?? ""}
+                  onChange={(e) =>
+                    setOpenEditUser((s: any) => ({ ...s, nome: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
+                <Label>Papel</Label>
+                <select
+                  className="border rounded px-3 py-2 w-full capitalize"
+                  value={openEditUser.papel ?? ""}
+                  onChange={(e) =>
+                    setOpenEditUser((s: any) => ({ ...s, papel: e.target.value }))
+                  }
+                >
+                  <option value="">—</option>
+                  <option value="owner">owner</option>
+                  <option value="admin">admin</option>
+                  <option value="sindico">sindico</option>
+                  <option value="morador">morador</option>
+                </select>
+              </div>
+
+              <DialogFooter className="mt-2">
+                <Button type="button" variant="outline" onClick={() => setOpenEditUser(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={updateUsuario.isPending}>
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
