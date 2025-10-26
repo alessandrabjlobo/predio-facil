@@ -1,4 +1,3 @@
-// FILE: src/pages/OS/OSPage.tsx
 import { useRef } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
 import TabsContainer from "@/components/patterns/TabsContainer";
@@ -45,6 +44,7 @@ export default function OSPage() {
       <PageHeader
         title="Ordens de Serviço"
         subtitle="Gerencie e acompanhe todas as ordens de serviço"
+        icon={ClipboardList}
         actions={
           <>
             <Button variant="outline" onClick={() => listRef.current?.exportarCSV?.()}>
@@ -57,7 +57,6 @@ export default function OSPage() {
             </Button>
           </>
         }
-        icon={ClipboardList}
       />
       <TabsContainer tabs={tabs} />
     </div>
