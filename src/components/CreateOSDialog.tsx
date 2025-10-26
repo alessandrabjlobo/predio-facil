@@ -78,14 +78,6 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
   prioridade,
   dataPrevista: dataPrevista?.toISOString().split("T")[0],
   slaDias: parseInt(slaDias || "0", 10),
-  // ❌ LINHA 81 REMOVIDA: local: ativo?.local,
-  tipoExecutor,
-  executanteId: tipoExecutor === "interno" ? executanteId : undefined,
-  executorNome: tipoExecutor === "externo" ? executorNome : undefined,
-  executorContato: tipoExecutor === "externo" ? executorContato : undefined,
-  executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
-  executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
-  custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
 });
 
 
