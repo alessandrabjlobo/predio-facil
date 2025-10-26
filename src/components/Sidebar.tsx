@@ -1,7 +1,6 @@
-// src/components/Sidebar.tsx
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { useUserRole, type UserRole } from "@/hooks/useUserRole";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Building2,
   LayoutDashboard,
@@ -28,6 +27,13 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
+const uniqueById = <T extends { condominio_id?: any; id?: any }>(arr: T[]) => {
+  // tenta condominio_id; se não houver, usa id
+  return Array.from(
+    new Map(arr.map((x, i) => [String(x.condominio_id ?? x.id ?? i), x])).values()
+  );
+};
+
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const { role } = useUserRole();
@@ -35,12 +41,18 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   // condos do usuário
   const { rows, loading } = useCondominiosDoUsuario();
-  const ids = useMemo(() => rows.map((r) => r.condominio_id), [rows]);
+  const rowsDedupe = useMemo(() => uniqueById(rows || []), [rows]);
+  const ids = useMemo(
+    () => rowsDedupe.map((r) => String(r.condominio_id)),
+    [rowsDedupe]
+  );
+
   const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
   const currentCondoName =
-    rows.find((r) => r.condominio_id === current)?.condominios?.nome || "Selecione";
+    rowsDedupe.find((r) => String(r.condominio_id) === String(current))?.condominios?.nome ||
+    "Selecione";
 
-  // grupos de navegação por papel (organizado como nos prints)
+  // grupos de navegação por papel
   const navigationGroups: NavGroup[] = useMemo(() => {
     if (role === "owner") {
       return [
@@ -112,11 +124,11 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       ];
     }
 
-    // fallback (usuário sem papel definido)
+    // fallback
     return [{ label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] }];
   }, [role]);
 
-  // carrega nome do usuário (mantido do seu código)
+  // carrega nome do usuário
   useEffect(() => {
     (async () => {
       const { data: userResp } = await supabase.auth.getUser();
@@ -143,7 +155,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   // garante current condominio válido
   useEffect(() => {
     if (!loading) {
-      if (!current || (ids.length && !ids.includes(current))) {
+      if (!current || (ids.length && !ids.includes(String(current)))) {
         const fallback = ids[0] ?? null;
         if (fallback) {
           setCurrent(fallback);
@@ -196,15 +208,15 @@ export default function Sidebar({ collapsed }: SidebarProps) {
             <div className="relative">
               <select
                 className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground appearance-none pr-8"
-                disabled={loading || rows.length === 0}
+                disabled={loading || rowsDedupe.length === 0}
                 value={current ?? ""}
                 onChange={(e) => {
                   setCurrent(e.target.value);
                   setCurrentCondominioId(e.target.value);
                 }}
               >
-                {rows.map((r) => (
-                  <option key={r.condominio_id} value={r.condominio_id}>
+                {rowsDedupe.map((r, idx) => (
+                  <option key={`${r.condominio_id}-${idx}`} value={String(r.condominio_id)}>
                     {r.condominios?.nome ?? r.condominio_id}
                   </option>
                 ))}
