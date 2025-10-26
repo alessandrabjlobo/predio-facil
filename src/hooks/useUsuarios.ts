@@ -32,17 +32,21 @@ export function useUsuarios() {
       password: string;
       metadata?: { nome?: string };
     }) => {
-      // Criar usuário no Auth
+      // Criar usuário no Auth com metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: payload.email,
         password: payload.password,
         options: {
-          data: payload.metadata,
+          data: payload.metadata || {},
+          emailRedirectTo: undefined,
         },
       });
 
       if (authError) throw authError;
       if (!authData.user) throw new Error("Falha ao criar usuário");
+
+      // Aguardar criação do perfil via trigger
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verificar se o perfil foi criado automaticamente via trigger
       const { data: perfil } = await supabase
@@ -76,6 +80,7 @@ export function useUsuarios() {
       patch: {
         email?: string;
         cpf?: string;
+        nome?: string;
       };
     }) => {
       const { id, patch } = args;

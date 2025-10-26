@@ -192,9 +192,9 @@ export default function AdminMaster() {
     e.preventDefault();
     if (!userForm.email.trim()) return;
     await createUsuario.mutateAsync({
-      nome: userForm.nome || null,
       email: userForm.email.trim(),
-      papel: userForm.papel || "sindico",
+      password: "123456",
+      metadata: { nome: userForm.nome || userForm.email.split("@")[0] },
     });
     setOpenNewUser(false);
     resetUserForm();
@@ -726,7 +726,6 @@ export default function AdminMaster() {
                   patch: {
                     nome: openEditUser.nome || null,
                     email: openEditUser.email || null,
-                    papel: openEditUser.papel || null,
                   },
                 });
                 setOpenEditUser(null);

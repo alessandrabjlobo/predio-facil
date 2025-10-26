@@ -14,7 +14,7 @@ export function useManutencoes(filters?: {
         .from("manutencoes")
         .select(`
           *,
-          ativos(id, nome, tipo_id),
+          ativos!inner(id, nome, tipo_id),
           planos_manutencao(id, titulo)
         `)
         .order("vencimento", { ascending: true });
@@ -26,7 +26,7 @@ export function useManutencoes(filters?: {
         query = query.eq("ativo_id", filters.ativo_id);
       }
       if (filters?.condominio_id) {
-        query = query.eq("condominio_id", filters.condominio_id);
+        query = query.eq("ativos.condominio_id", filters.condominio_id);
       }
 
       const { data, error } = await query;
