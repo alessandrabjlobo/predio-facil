@@ -70,23 +70,24 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
 
     // UMA ÚNICA chamada ao mutateAsync (antes tinham duas)
     await createOS.mutateAsync({
-      titulo,
-      descricao,
-      ativoId, // string
-      planoId: initialData?.planoId,
-      tipo,
-      prioridade,
-      dataPrevista: dataPrevista?.toISOString().split("T")[0],
-      slaDias: parseInt(slaDias || "0", 10),
-      local: ativo?.local, // mantém local se existir
-      tipoExecutor,
-      executanteId: tipoExecutor === "interno" ? executanteId : undefined,
-      executorNome: tipoExecutor === "externo" ? executorNome : undefined,
-      executorContato: tipoExecutor === "externo" ? executorContato : undefined,
-      executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
-      executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
-      custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
-    });
+  titulo,
+  descricao,
+  ativoId, // string
+  planoId: initialData?.planoId,
+  tipo,
+  prioridade,
+  dataPrevista: dataPrevista?.toISOString().split("T")[0],
+  slaDias: parseInt(slaDias || "0", 10),
+  // ❌ LINHA 81 REMOVIDA: local: ativo?.local,
+  tipoExecutor,
+  executanteId: tipoExecutor === "interno" ? executanteId : undefined,
+  executorNome: tipoExecutor === "externo" ? executorNome : undefined,
+  executorContato: tipoExecutor === "externo" ? executorContato : undefined,
+  executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
+  executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
+  custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
+});
+
 
     onOpenChange(false);
     resetForm();
