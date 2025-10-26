@@ -1,5 +1,4 @@
-import { Home, Calendar, MessageSquare, ClipboardList, Clock, Package, ShoppingBag, FileText, Shield, Settings, Users } from "lucide-react";
-import { LayoutDashboard, Wrench, Building2, ClipboardCheck, LogOut, Shield, Calendar } from "lucide-react";
+import { Home, Calendar, MessageSquare, ClipboardList, Clock, Package, ShoppingBag, FileText, Shield, Settings, Users, LayoutDashboard, Wrench, Building2, ClipboardCheck, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
