@@ -1,18 +1,29 @@
-﻿import { supabase } from "@/integrations/supabase/client";
+// src/lib/api.ts
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  Papel,
+  Status,
+  Prioridade,
+  ManutTipo,
+  ExecStatus,
+  ConfTipo,
+  Semaforo,
+  ConfAcao
+} from "./types";
 
-/* ===========================
- * Tipos base
- * =========================== */
-export type Papel =
-  | "sindico"
-  | "admin"
-  | "funcionario"
-  | "zelador"
-  | "morador"
-  | "fornecedor"
-  | "conselho";
+export type { Papel, Status, Prioridade, ManutTipo, ExecStatus, ConfTipo, Semaforo, ConfAcao };
 
-export type Status = "aberto" | "em_andamento" | "concluido" | "cancelado";
+export type NovoChamadoInput = {
+  titulo: string;
+  descricao?: string;
+  prioridade?: Prioridade;
+  condominio_id?: string;
+  ativo_id?: string;
+  local?: string | null;
+  categoria?: string | null;
+};
+
+// ... resto do arquivo permanece igual
 export type Prioridade = "baixa" | "media" | "alta" | "urgente";
 
 export type NovoChamadoInput = {
