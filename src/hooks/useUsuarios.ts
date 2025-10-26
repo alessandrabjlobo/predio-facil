@@ -1,3 +1,4 @@
+// src/hooks/useUsuarios.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -14,6 +15,38 @@ export const useUsuarios = () => {
         .order("nome");
       if (error) throw error;
       return data || [];
+    },
+  });
+
+  // ✅ NOVA: criar usuário (apenas linha na tabela `usuarios`)
+  const createUsuario = useMutation({
+    mutationFn: async (payload: {
+      nome?: string | null;
+      email: string;
+      papel?: string | null; // "sindico" | "admin" | "owner" | "morador"
+    }) => {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .insert({
+          nome: payload.nome ?? null,
+          email: payload.email,
+          papel: payload.papel ?? "sindico",
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      toast({ title: "Sucesso", description: "Usuário criado!" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro",
+        description: `Erro ao criar usuário: ${error.message}`,
+        variant: "destructive",
+      });
     },
   });
 
@@ -41,7 +74,7 @@ export const useUsuarios = () => {
 
   const deleteUsuario = useMutation({
     mutationFn: async (id: string) => {
-      // se houver vínculos em usuarios_condominios, remova-os antes
+      // Remover vínculos antes, se existirem
       await supabase.from("usuarios_condominios").delete().eq("usuario_id", id);
       const { error } = await supabase.from("usuarios").delete().eq("id", id);
       if (error) throw error;
@@ -59,5 +92,5 @@ export const useUsuarios = () => {
     },
   });
 
-  return { usuarios, isLoading, updateUsuario, deleteUsuario };
+  return { usuarios, isLoading, createUsuario, updateUsuario, deleteUsuario };
 };
