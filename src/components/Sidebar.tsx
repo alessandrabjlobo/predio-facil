@@ -59,8 +59,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         {
           label: "Gestão",
           items: [
-            { name: "Condomínios", href: "/admin?tab=condominios", icon: Building2 },
-            { name: "Usuários", href: "/admin?tab=usuarios", icon: Users },
+            { name: "Condomínios", href: "/condominios", icon: Building2 },
+            { name: "Usuários", href: "/usuarios", icon: Users },
           ],
         },
         {
@@ -156,6 +156,19 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     navigate("/login");
   }
 
+  // Helper para verificar se o link está ativo
+  const isActive = (href: string) => {
+    // Remove query params para comparação
+    const currentPath = location.pathname;
+    const hrefPath = href.split('?')[0];
+    
+    if (href === "/" || href === "/admin") {
+      return currentPath === hrefPath;
+    }
+    
+    return currentPath.startsWith(hrefPath);
+  };
+
   return (
     <div
       className={`${
@@ -180,7 +193,13 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       {/* Navegação */}
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
-          <Section key={group.label} label={group.label} collapsed={collapsed} items={group.items} />
+          <Section 
+            key={group.label} 
+            label={group.label} 
+            collapsed={collapsed} 
+            items={group.items}
+            isActive={isActive}
+          />
         ))}
       </nav>
 
@@ -240,10 +259,12 @@ function Section({
   label,
   items,
   collapsed,
+  isActive,
 }: {
   label: string;
   items: NavItem[];
   collapsed: boolean;
+  isActive: (href: string) => boolean;
 }) {
   if (!items.length) return null;
   return (
@@ -258,16 +279,13 @@ function Section({
           <NavLink
             key={item.href}
             to={item.href}
-            end={item.href === "/" || item.href === "/admin"}
-            className={({ isActive }) =>
-              `flex items-center ${
-                collapsed ? "justify-center" : "space-x-3"
-              } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              }`
-            }
+            className={`flex items-center ${
+              collapsed ? "justify-center" : "space-x-3"
+            } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isActive(item.href)
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            }`}
             title={collapsed ? item.name : undefined}
           >
             <item.icon className="h-5 w-5 flex-shrink-0" />
