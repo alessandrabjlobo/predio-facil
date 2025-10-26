@@ -1,4 +1,3 @@
-// src/pages/Conformidade.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
   listConformidadeItens,
@@ -22,6 +21,7 @@ import {
   CalendarDays, Info, Paperclip, CheckCircle2, ChevronDown, ChevronRight, User, MapPin, Factory, AlertTriangle, ExternalLink,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Page } from "@/components/layout/CheckPage";
 
 /* ========= utils ========= */
 type Semaforo = "verde" | "amarelo" | "vermelho";
@@ -296,7 +296,7 @@ export default function Conformidade() {
   }, []);
 
   const resumo = useMemo(() => {
-    const c = { verde: 0, amarelo: 0, vermelho: 0 };
+    const c = { verde: 0, amarelo: 0, vermelho: 0 } as any;
     itens.forEach((i) => (c[i.status as Semaforo] += 1));
     return c;
   }, [itens]);
@@ -343,16 +343,12 @@ export default function Conformidade() {
     setOpen(true);
   }
 
-  function goToAtivo(item: any) {
-    const id = item?.ativo?.id;
-    if (!id) return;
-    window.location.href = `/ativos?ativo=${encodeURIComponent(id)}&tab=historico`;
-  }
-
   function openResolver(item: any) {
     // para sintético não existe registro na tabela de conformidade; mandamos para o ativo
     if (isSynthetic(item)) {
-      goToAtivo(item);
+      const id = item?.ativo?.id;
+      if (!id) return;
+      window.location.href = `/ativos?ativo=${encodeURIComponent(id)}&tab=historico`;
       return;
     }
     setResItem(item);
@@ -363,18 +359,19 @@ export default function Conformidade() {
   const tipoSelectId = "conf-tipo-select";
 
   return (
-    <div className="p-6 grid gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Conformidade Predial</h1>
-          <p className="text-gray-600">Tudo que impacta conformidade, calculado a partir dos planos/manutenções dos ativos.</p>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.verde)} /> {resumo.verde}</span>
-          <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.amarelo)} /> {resumo.amarelo}</span>
-          <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.vermelho)} /> {resumo.vermelho}</span>
-        </div>
-      </div>
+    <Page>
+      <Page.Header
+        icon={CalendarDays}
+        title="Conformidade Predial"
+        subtitle="Tudo que impacta conformidade, calculado a partir dos planos/manutenções dos ativos."
+        actions={
+          <div className="flex items-center gap-4 text-sm">
+            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.verde)} /> {resumo.verde}</span>
+            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.amarelo)} /> {resumo.amarelo}</span>
+            <span className="flex items-center gap-1"><span className={cls("w-2 h-2 rounded-full", dot.vermelho)} /> {resumo.vermelho}</span>
+          </div>
+        }
+      />
 
       {erro && (
         <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm">
@@ -528,7 +525,7 @@ export default function Conformidade() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </Page>
   );
 }
 
@@ -537,7 +534,7 @@ function StatusSection({
   titulo, cor, itens, open, setOpen, onResolver, onDetalhes, loading,
 }: {
   titulo: string;
-  cor: Semaforo;
+  cor: "vermelho" | "amarelo" | "verde";
   itens: any[];
   open: boolean;
   setOpen: (v: boolean) => void;
@@ -599,9 +596,9 @@ function StatusSection({
                   </td>
                   <td className="p-2">
                     <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" className="h-8" onClick={() => onResolver(i)} title={isSynthetic(i) ? "Ir para o ativo para concluir" : "Resolver"}>
+                      <Button size="sm" className="h-8" onClick={() => onResolver(i)} title={String(i?.id || "").startsWith("ativo:") ? "Ir para o ativo para concluir" : "Resolver"}>
                         <CheckCircle2 className="w-4 h-4 mr-1" />
-                        {isSynthetic(i) ? "Resolver no ativo" : "Resolver"}
+                        {String(i?.id || "").startsWith("ativo:") ? "Resolver no ativo" : "Resolver"}
                       </Button>
                       <Button size="sm" variant="ghost" className="h-8" onClick={() => onDetalhes(i)}>
                         <Info className="w-4 h-4 mr-1" />
@@ -656,7 +653,6 @@ function DetailsBody({
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     if (isSynth) {
-      // sintético: edição aqui não persiste na tabela de conformidade; sugerimos ir ao ativo
       onOpenAtivo?.();
       return;
     }
@@ -700,7 +696,6 @@ function DetailsBody({
         </div>
       )}
 
-      {/* Cabeçalho de datas/periodicidade */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <Label htmlFor={lastId}>Último</Label>
@@ -729,7 +724,6 @@ function DetailsBody({
         </Button>
       </div>
 
-      {/* Laudos (apenas itens reais) */}
       {!isSynth && (
         <div className="border rounded-md p-3">
           <div className="flex items-center justify-between mb-2">
@@ -760,7 +754,6 @@ function DetailsBody({
         </div>
       )}
 
-      {/* Quando for sintético, exibimos Planos e Manutenções do ativo aqui */}
       {isSynth && (
         <div className="grid gap-4">
           <div className="border rounded-md">
@@ -823,7 +816,6 @@ function DetailsBody({
         </div>
       )}
 
-      {/* Histórico (somente itens reais) */}
       {!isSynth && (
         <div className="border rounded-md p-3">
           <div className="font-medium mb-2">Histórico</div>
@@ -928,8 +920,8 @@ function LogRow({ log }: { log: any }) {
 
       <div className="mt-1 text-xs text-gray-500 flex items-center gap-2">
         <User className="w-3.5 h-3.5" />
-        <span className="truncate">{actorName ?? "Usuário"}</span>
-        <span>• {fmtDateTime(created_at)}</span>
+        <span className="truncate">{log.actorName ?? "Usuário"}</span>
+        <span>• {fmtDateTime(log.created_at)}</span>
         <span className="mx-1">•</span>
         <button type="button" onClick={() => setOpen((v) => !v)} className="text-blue-600 hover:underline">
           {open ? "Ocultar detalhes" : "Mostrar detalhes"}
