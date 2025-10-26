@@ -1,10 +1,10 @@
-// FILE: src/pages/OS/OSPage.tsx
 import { useRef } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
 import TabsContainer from "@/components/patterns/TabsContainer";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Download, ClipboardList } from "lucide-react";
 import OSList, { OSListHandle } from "@/components/os/OSList";
+import OSKanban from "@/components/os/OSKanban";
 
 export default function OSPage() {
   const listRef = useRef<OSListHandle | null>(null);
@@ -23,8 +23,8 @@ export default function OSPage() {
       id: "kanban",
       label: "Kanban",
       content: (
-        <div className="p-6 text-center text-muted-foreground">
-          Kanban: A Fazer | Em Execução | A Aprovar | Concluída (implementar)
+        <div className="p-0">
+          <OSKanban />
         </div>
       ),
     },
@@ -44,6 +44,7 @@ export default function OSPage() {
       <PageHeader
         title="Ordens de Serviço"
         subtitle="Gerencie e acompanhe todas as ordens de serviço"
+        icon={ClipboardList}
         actions={
           <>
             <Button variant="outline" onClick={() => listRef.current?.exportarCSV?.()}>
@@ -56,7 +57,6 @@ export default function OSPage() {
             </Button>
           </>
         }
-        icon={ClipboardList}
       />
       <TabsContainer tabs={tabs} />
     </div>
