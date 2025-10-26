@@ -1,3 +1,4 @@
+// FILE: src/pages/ConfiguracoesPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
   listAtivoTipos,
@@ -59,7 +60,8 @@ function Section({ title, subtitle, children }: any) {
 }
 
 export default function ConfiguracoesPage() {
-  const [tab, setTab] = useState<"tipos" | "templates" | "categorias" | "locais" | "condo">("tipos");
+  // ✅ inclui "nbr" no tipo do estado
+  const [tab, setTab] = useState<"tipos" | "templates" | "categorias" | "locais" | "condo" | "nbr">("tipos");
 
   return (
     <Page>
@@ -97,6 +99,11 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="condo" className="mt-4">
           <CondominioTab />
+        </TabsContent>
+
+        {/* ✅ NÃO aninhar dentro de outro TabsContent */}
+        <TabsContent value="nbr" className="mt-4">
+          <NBRKnowledgeBase />
         </TabsContent>
       </Tabs>
     </Page>
@@ -928,6 +935,23 @@ function CondominioTab() {
             Atualizado em {new Date(cfg.updated_at).toLocaleString()}
           </p>
         )}
+      </Section>
+    </div>
+  );
+}
+
+/* ==================== Base NBR 5674 (placeholder) ==================== */
+function NBRKnowledgeBase() {
+  return (
+    <div className="grid gap-4">
+      <Section
+        title="Base NBR 5674"
+        subtitle="Ponto único para armazenar resumos, requisitos e checklists por sistema com base na NBR 5674. (A implementar: ingestão de artigos, mapeamento de requisitos por tipo de ativo, vinculação automática aos templates.)"
+      >
+        <p className="text-sm text-muted-foreground">
+          Em breve: cadastre itens de conformidade, periodicidades e anexos oficiais. Estas definições
+          alimentarão automaticamente os templates de manutenção e o módulo de conformidade.
+        </p>
       </Section>
     </div>
   );
