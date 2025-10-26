@@ -61,7 +61,7 @@ export default function App() {
               />
               <Route path="/auth/set-password" element={<SetPasswordPage />} />
 
-              {/* Rotas protegidas */}
+                        {/* Rotas protegidas */}
               <Route
                 path="/"
                 element={
@@ -82,6 +82,12 @@ export default function App() {
                   } 
                 />
 
+                {/* Condomínio Detalhe */}
+                <Route path="condominios/:id" element={<CondominioDetalhe />} />
+
+                {/* Ativo Detalhe */}
+                <Route path="ativos/:id" element={<AtivoDetalhe />} />
+
                 {/* Síndico/Admin de condomínio */}
                 <Route 
                   path="dashboard/sindico" 
@@ -100,6 +106,7 @@ export default function App() {
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
               </Route>
+
 
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
