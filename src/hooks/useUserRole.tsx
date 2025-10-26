@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = "owner" | "sindico" | "admin" | "funcionario" | "zelador" | "fornecedor" | "morador" | "conselho" | null;
+export type UserRole =
+  | "owner"
+  | "sindico"
+  | "admin"
+  | "funcionario"
+  | "zelador"
+  | "fornecedor"
+  | "morador"
+  | "conselho"
+  | null;
 
 export function useUserRole() {
   const [role, setRole] = useState<UserRole>(null);
@@ -13,7 +22,10 @@ export function useUserRole() {
 
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
         if (!user) {
           if (mounted) {
             setRole(null);
@@ -22,7 +34,7 @@ export function useUserRole() {
           return;
         }
 
-        // 1. Verificar se é dono do sistema
+        // 1) Dono do sistema?
         const { data: isOwner } = await supabase.rpc("is_system_owner");
         if (isOwner) {
           if (mounted) {
@@ -32,7 +44,7 @@ export function useUserRole() {
           return;
         }
 
-        // 2. Buscar papel do usuário no condomínio principal
+        // 2) Linha de usuário
         const { data: usuario } = await supabase
           .from("usuarios")
           .select("id")
@@ -47,7 +59,7 @@ export function useUserRole() {
           return;
         }
 
-        // 3. Buscar relação principal com condomínio
+        // 3) Relação principal com condomínio
         const { data: relacao } = await supabase
           .from("usuarios_condominios")
           .select("papel, condominio_id")
@@ -56,7 +68,7 @@ export function useUserRole() {
           .maybeSingle();
 
         if (!relacao) {
-          // Fallback: pegar primeira relação
+          // fallback: primeira relação
           const { data: primeiraRelacao } = await supabase
             .from("usuarios_condominios")
             .select("papel, condominio_id")
@@ -65,7 +77,7 @@ export function useUserRole() {
             .maybeSingle();
 
           if (mounted) {
-            setRole(primeiraRelacao?.papel as UserRole || null);
+            setRole((primeiraRelacao?.papel as UserRole) || null);
             setCondominioId(primeiraRelacao?.condominio_id || null);
             setLoading(false);
           }
@@ -77,8 +89,8 @@ export function useUserRole() {
           setCondominioId(relacao.condominio_id);
           setLoading(false);
         }
-      } catch (error) {
-        console.error("Erro ao carregar papel do usuário:", error);
+      } catch (err) {
+        console.error("Erro ao carregar papel do usuário:", err);
         if (mounted) {
           setRole(null);
           setLoading(false);
@@ -93,6 +105,3 @@ export function useUserRole() {
 
   return { role, loading, condominioId };
 }
-
-// Re-exportar o tipo para uso em outros arquivos
-export { type UserRole };
