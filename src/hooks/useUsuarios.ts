@@ -1,9 +1,8 @@
-// src/hooks/useUsuarios.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-export const useUsuarios = () => {
+export function useUsuarios() {
   const queryClient = useQueryClient();
 
   const { data: usuarios, isLoading } = useQuery({
@@ -11,31 +10,52 @@ export const useUsuarios = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("usuarios")
-        .select("*")
-        .order("nome");
+        .select(`
+          *,
+          user_roles(role),
+          usuarios_condominios(
+            condominio_id,
+            papel,
+            is_principal,
+            condominios(id, nome)
+          )
+        `)
+        .order("email");
       if (error) throw error;
       return data || [];
     },
   });
 
-  // ✅ NOVA: criar usuário (apenas linha na tabela `usuarios`)
   const createUsuario = useMutation({
     mutationFn: async (payload: {
-      nome?: string | null;
       email: string;
-      papel?: string | null; // "sindico" | "admin" | "owner" | "morador"
+      password: string;
+      metadata?: { nome?: string };
     }) => {
-      const { data, error } = await supabase
+      // Criar usuário no Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: payload.email,
+        password: payload.password,
+        options: {
+          data: payload.metadata,
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("Falha ao criar usuário");
+
+      // Verificar se o perfil foi criado automaticamente via trigger
+      const { data: perfil } = await supabase
         .from("usuarios")
-        .insert({
-          nome: payload.nome ?? null,
-          email: payload.email,
-          papel: payload.papel ?? "sindico",
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+        .select("*")
+        .eq("auth_user_id", authData.user.id)
+        .maybeSingle();
+
+      if (!perfil) {
+        throw new Error("Perfil não foi criado automaticamente");
+      }
+
+      return perfil;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usuarios"] });
@@ -43,8 +63,8 @@ export const useUsuarios = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Erro",
-        description: `Erro ao criar usuário: ${error.message}`,
+        title: "Erro ao criar usuário",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -53,10 +73,16 @@ export const useUsuarios = () => {
   const updateUsuario = useMutation({
     mutationFn: async (args: {
       id: string;
-      patch: { nome?: string | null; email?: string | null; papel?: string | null };
+      patch: {
+        email?: string;
+        cpf?: string;
+      };
     }) => {
       const { id, patch } = args;
-      const { error } = await supabase.from("usuarios").update(patch).eq("id", id);
+      const { error } = await supabase
+        .from("usuarios")
+        .update(patch)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -65,8 +91,8 @@ export const useUsuarios = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Erro",
-        description: `Erro ao atualizar usuário: ${error.message}`,
+        title: "Erro ao atualizar usuário",
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -74,8 +100,10 @@ export const useUsuarios = () => {
 
   const deleteUsuario = useMutation({
     mutationFn: async (id: string) => {
-      // Remover vínculos antes, se existirem
+      // Remover vínculos
       await supabase.from("usuarios_condominios").delete().eq("usuario_id", id);
+      await supabase.from("user_roles").delete().eq("user_id", id);
+      
       const { error } = await supabase.from("usuarios").delete().eq("id", id);
       if (error) throw error;
     },
@@ -85,12 +113,39 @@ export const useUsuarios = () => {
     },
     onError: (error: any) => {
       toast({
-        title: "Erro",
-        description: `Erro ao excluir usuário: ${error.message}`,
+        title: "Erro ao excluir usuário",
+        description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  return { usuarios, isLoading, createUsuario, updateUsuario, deleteUsuario };
-};
+  const assignRole = useMutation({
+    mutationFn: async (params: { user_id: string; role: string }) => {
+      const { error } = await supabase
+        .from("user_roles")
+        .insert({ user_id: params.user_id, role: params.role as any });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      toast({ title: "Sucesso", description: "Role atribuída!" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atribuir role",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return { 
+    usuarios, 
+    isLoading, 
+    createUsuario, 
+    updateUsuario, 
+    deleteUsuario,
+    assignRole,
+  };
+}
