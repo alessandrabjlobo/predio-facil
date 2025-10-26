@@ -1,99 +1,76 @@
-import { useEffect, useState, ReactNode } from "react";
+// src/components/RequireRole.tsx
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { type Papel } from "@/lib/types";
 import { getCurrentCondominioId } from "@/lib/tenant";
 
-/**
- * Restringe acesso por papel do usuário dentro de um condomínio.
- * - owner/admin têm passe livre (acesso global)
- * - demais papéis são avaliados pelo condomínio atual (ou vínculo principal)
- *
- * Ex.: <RequireRole allowed={['sindico','funcionario']}> ... </RequireRole>
- */
 export default function RequireRole({
   allowed,
   children,
 }: {
   allowed: Papel[];
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   const [loading, setLoading] = useState(true);
-  const [permitido, setPermitido] = useState<boolean>(false);
+  const [temAcesso, setTemAcesso] = useState<boolean>(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
-
     (async () => {
       try {
-        // 1) Usuário autenticado
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          if (mounted) setPermitido(false);
-          return;
-        }
+        if (!user || !mounted) return;
 
-        // 2) Perfil global (para owner/admin)
-        const { data: perfil, error: ePerfil } = await supabase
+        // pega o perfil (id interno)
+        const { data: usuario } = await supabase
           .from("usuarios")
-          .select("id, papel")
+          .select("id")
           .eq("auth_user_id", user.id)
           .maybeSingle();
-        if (ePerfil) throw ePerfil;
 
-        const papelGlobal = (perfil?.papel || "").toLowerCase() as Papel | "";
-        // Passe livre para owner/admin
-        if (papelGlobal === "owner" || papelGlobal === "admin") {
-          if (mounted) {
-            setPermitido(true);
-            setLoading(false);
-          }
-          return;
-        }
+        if (!usuario || !mounted) return;
 
-        // 3) Papel no condomínio atual OU vínculo principal
-        const condoId = getCurrentCondominioId();
+        const condominioAtual = getCurrentCondominioId();
 
-        let papelNoCondo: string | null = null;
+        // 1) se tem condomínio atual, verifica papel nesse condomínio
+        if (condominioAtual) {
+          const { data: rel } = await supabase
+            .from("usuarios_condominios")
+            .select("papel")
+            .eq("usuario_id", usuario.id)
+            .eq("condominio_id", condominioAtual)
+            .maybeSingle();
 
-        if (perfil?.id) {
-          if (condoId) {
-            // papel específico do condomínio selecionado
-            const { data: relacaoByCondo } = await supabase
-              .from("usuarios_condominios")
-              .select("papel")
-              .eq("usuario_id", perfil.id)
-              .eq("condominio_id", condoId)
-              .maybeSingle();
-
-            papelNoCondo = (relacaoByCondo?.papel as string | undefined) ?? null;
-          } else {
-            // fallback: vínculo principal
-            const { data: relacaoPrincipal } = await supabase
-              .from("usuarios_condominios")
-              .select("papel")
-              .eq("usuario_id", perfil.id)
-              .eq("is_principal", true)
-              .maybeSingle();
-
-            papelNoCondo = (relacaoPrincipal?.papel as string | undefined) ?? null;
+          const papelAtual = rel?.papel as Papel | undefined;
+          if (papelAtual && allowed.includes(papelAtual)) {
+            if (mounted) setTemAcesso(true);
+            return;
           }
         }
 
-        // 4) Checagem final com lista allowed
-        const papelEfetivo = (papelNoCondo || "").toLowerCase() as Papel | "";
-        const allowedLower = allowed.map((p) => (p || "").toLowerCase());
-        const ok = !!papelEfetivo && allowedLower.includes(papelEfetivo);
+        // 2) fallback: qualquer relação com papel permitido em QUALQUER condomínio
+        const { data: rels } = await supabase
+          .from("usuarios_condominios")
+          .select("papel")
+          .eq("usuario_id", usuario.id);
 
-        if (mounted) setPermitido(ok);
-      } catch (_e) {
-        if (mounted) setPermitido(false);
+        const algumPapelValido = (rels ?? []).some((r) =>
+          allowed.includes((r.papel as Papel) || "morador")
+        );
+
+        if (mounted) setTemAcesso(algumPapelValido);
+      } catch (e: any) {
+        if (mounted) setErro(e?.message ?? "Erro ao checar permissões");
       } finally {
         if (mounted) setLoading(false);
       }
     })();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [allowed]);
 
   if (loading) {
@@ -104,7 +81,7 @@ export default function RequireRole({
     );
   }
 
-  if (!permitido) {
+  if (erro || !temAcesso) {
     return <Navigate to="/" replace />;
   }
 
