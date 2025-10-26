@@ -31,9 +31,12 @@ export const useCondominios = () => {
       endereco?: string | null;
       unidades?: number | null;
       cnpj?: string | null;
-      sindico_id?: string | null; // opcional: se vier, já vincula
+      cidade?: string | null;
+      uf?: string | null;
+      sindico_id?: string | null; // se vier, já vincula
     }) => {
       const { sindico_id, ...dados } = payload;
+
       const { data: novo, error } = await supabase
         .from("condominios")
         .insert(dados)
@@ -75,6 +78,8 @@ export const useCondominios = () => {
         endereco?: string | null;
         unidades?: number | null;
         cnpj?: string | null;
+        cidade?: string | null;
+        uf?: string | null;
       };
     }) => {
       const { id, patch } = args;
