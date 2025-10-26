@@ -1,11 +1,11 @@
-// src/components/RequireRole.tsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { type Papel } from "@/lib/api";
+import { type Papel } from "@/lib/types";
 
 /**
- * Restringe acesso por papel do usuário.
+ * Restringe acesso por papel do usuário dentro de um condomínio.
+ * Para acesso de owner, use RequireOwner
  * Ex.: <RequireRole allowed={['sindico','funcionario']}> ... </RequireRole>
  */
 export default function RequireRole({
