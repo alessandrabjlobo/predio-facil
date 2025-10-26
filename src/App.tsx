@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import RequireRole from "@/components/RequireRole";
+import RequireOwner from "@/components/RequireOwner";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 
 // Páginas
@@ -71,20 +72,27 @@ export default function App() {
               >
                 <Route index element={<TenantIndex />} />
 
-                {/* Admin */}
+                {/* Admin Master (apenas owner) */}
                 <Route 
                   path="admin" 
                   element={
-                    <RequireRole allowed={["admin", "owner"]}>
+                    <RequireOwner>
                       <AdminMaster />
+                    </RequireOwner>
+                  } 
+                />
+
+                {/* Síndico/Admin de condomínio */}
+                <Route 
+                  path="dashboard/sindico" 
+                  element={
+                    <RequireRole allowed={["sindico", "admin"]}>
+                      <Dashboard />
                     </RequireRole>
                   } 
                 />
 
-                {/* Síndico */}
-                <Route path="dashboard/sindico" element={<Dashboard />} />
-
-                {/* Módulos */}
+                {/* Módulos (protegidos por autenticação) */}
                 <Route path="ativos" element={<Ativos />} />
                 <Route path="os" element={<OS />} />
                 <Route path="conformidade" element={<Conformidade />} />
