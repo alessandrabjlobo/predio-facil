@@ -1,30 +1,24 @@
-// src/pages/DashboardAdmin.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Users,
-  Building2,
-  DollarSign,
-  ShieldCheck,
-  FileText,
-  Plus,
   ClipboardList,
   Wrench,
   Package,
+  ShieldCheck,
+  FileText,
   AlertTriangle,
   Clock,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
-// ✅ seus componentes de dashboard (já existem no projeto)
 import KpiCard from "@/components/dashboard/KpiCard";
 import MiniCalendar from "@/components/dashboard/MiniCalendar";
+import { CondominioSwitcher } from "@/components/CondominioSwitcher";
+import { useCondominioAtual } from "@/hooks/useCondominioAtual";
 
-// ✅ tema do calendário (já existe no projeto)
 import "@/styles/fullcalendar-theme.css";
 
 // (opcional) se você já tem essas funções no seu lib/api, os imports abaixo funcionam;
@@ -55,11 +49,10 @@ type Manutencao = {
 
 export default function DashboardAdmin() {
   const nav = useNavigate();
+  const { condominio } = useCondominioAtual();
+  const condoId = condominio?.id ?? null;
 
   const [loading, setLoading] = useState(true);
-  const [condominioNome, setCondominioNome] = useState("Condomínio");
-
-  // KPIs
   const [stats, setStats] = useState({
     usuarios: 0,
     sindicos: 0,
@@ -67,19 +60,17 @@ export default function DashboardAdmin() {
     gastos: "R$ 0",
   });
 
-  // Listas
   const [osRecentes, setOsRecentes] = useState<OSItem[]>([]);
   const [alertas, setAlertas] = useState<{ id: string; titulo: string; severidade: "alta" | "media" | "baixa" }[]>([]);
   const [proximas, setProximas] = useState<Manutencao[]>([]);
 
-  // Eventos do calendário (derivado de "proximas")
   const eventos = useMemo(
     () =>
       proximas.map((p) => ({
         id: p.id,
         title: p.titulo,
         start: p.data,
-        extendedProps: { status: p.status ?? "agendado" as const },
+        extendedProps: { status: (p.status ?? "agendado") as const },
       })),
     [proximas]
   );
@@ -88,52 +79,47 @@ export default function DashboardAdmin() {
     (async () => {
       setLoading(true);
       try {
-        // usuário atual
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // pega usuario.id na tabela "usuarios"
-        const { data: usuario } = await supabase
-          .from("usuarios")
-          .select("id")
-          .eq("auth_user_id", user.id)
-          .maybeSingle();
-
-        if (!usuario) return;
-
-        // pega condomínio principal + nome
-        const { data: relacao } = await supabase
-          .from("usuarios_condominios")
-          .select("condominio_id, condominios(nome)")
-          .eq("usuario_id", usuario.id)
-          .eq("is_principal", true)
-          .maybeSingle();
-
-        const condoId = relacao?.condominio_id ?? null;
-        const nome = (relacao as any)?.condominios?.nome ?? "Condomínio";
-        setCondominioNome(nome);
-
-        // ---- KPIs ----
-        if (condoId) {
-          const [usuariosRes, ativosRes] = await Promise.all([
-            supabase.from("usuarios_condominios").select("id", { count: "exact" }).eq("condominio_id", condoId),
-            supabase.from("ativos").select("id", { count: "exact" }).eq("condominio_id", condoId),
-          ]);
-
-          setStats({
-            usuarios: usuariosRes?.count ?? 0,
-            sindicos: 3, // TODO: contar papéis de síndico quando sua view/tabela estiver pronta
-            ativos: ativosRes?.count ?? 0,
-            gastos: "R$ 85.450", // TODO: virar soma real de despesas do mês
-          });
+        // Se ainda não temos condomínio (ex.: acabou de logar), zera a tela
+        if (!condoId) {
+          setStats({ usuarios: 0, sindicos: 0, ativos: 0, gastos: "R$ 0" });
+          setOsRecentes([]);
+          setProximas([]);
+          setAlertas([]);
+          return;
         }
 
-        // ---- Listas (usa lib/api se existir; senão, fallbacks) ----
+        // ---- KPIs por condomínio ----
+        const [usuariosRes, ativosRes, sindicosRes] = await Promise.all([
+          supabase
+            .from("usuarios_condominios")
+            .select("id", { count: "exact" })
+            .eq("condominio_id", condoId),
+          supabase
+            .from("ativos")
+            .select("id", { count: "exact" })
+            .eq("condominio_id", condoId),
+          supabase
+            .from("usuarios_condominios")
+            .select("id", { count: "exact" })
+            .eq("condominio_id", condoId)
+            .eq("papel", "sindico"),
+        ]);
+
+        setStats({
+          usuarios: usuariosRes?.count ?? 0,
+          sindicos: sindicosRes?.count ?? 0,
+          ativos: ativosRes?.count ?? 0,
+          // TODO: substituir por soma real de despesas do mês do condomínio
+          gastos: "R$ 85.450",
+        });
+
+        // ---- Listas por condomínio ----
         // OS Recentes
         if (api?.listOS) {
-          const todas: OSItem[] = await api.listOS({ limit: 6 });
-          setOsRecentes(todas.slice(0, 6));
+          const todas: OSItem[] = await api.listOS({ condominio_id: condoId, limit: 6 });
+          setOsRecentes((todas || []).slice(0, 6));
         } else {
+          // fallback
           setOsRecentes([
             { id: "OS-1023", titulo: "Troca de filtro bomba JN-02", status: "em andamento", previsao: new Date().toISOString(), ativo_nome: "Bomba JN-02" },
             { id: "OS-1022", titulo: "Lubrificação exaustor G2", status: "aberta", previsao: null, ativo_nome: "Exaustor G2" },
@@ -143,9 +129,9 @@ export default function DashboardAdmin() {
 
         // Próximas manutenções / calendário
         if (api?.listUpcomingManutencoes) {
-          const prox = await api.listUpcomingManutencoes(7);
+          const prox = await api.listUpcomingManutencoes(7, { condominio_id: condoId });
           setProximas(
-            prox.map((p: any) => ({
+            (prox || []).map((p: any) => ({
               id: p.id,
               titulo: p.titulo ?? "Manutenção",
               data: p.data_prevista ?? p.start,
@@ -160,11 +146,11 @@ export default function DashboardAdmin() {
           ]);
         }
 
-        // Alertas prioritários (ex.: atrasadas)
+        // Alertas prioritários (ex.: atrasadas do condomínio)
         if (api?.listAtrasadas) {
-          const atrasadas = await api.listAtrasadas();
+          const atrasadas = await api.listAtrasadas({ condominio_id: condoId });
           setAlertas(
-            atrasadas.map((a: any) => ({
+            (atrasadas || []).map((a: any) => ({
               id: a.id,
               titulo: a.titulo ?? "Manutenção atrasada",
               severidade: "alta",
@@ -177,18 +163,23 @@ export default function DashboardAdmin() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [condoId]);
 
   return (
     <div className="p-6 max-w-[1320px] mx-auto space-y-6">
-      {/* Título + Ações rápidas */}
+      {/* Título + Seletor + Ações rápidas */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-[22px] font-semibold tracking-tight">Visão Geral do Condomínio</h2>
-          <p className="text-muted-foreground text-sm">{condominioNome}</p>
+          <p className="text-muted-foreground text-sm">
+            {condominio?.nome ?? "Selecione um condomínio"}
+          </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          {/* Selecionador de condomínio visível aqui */}
+          <CondominioSwitcher />
+
           <Button onClick={() => nav("/os")}>
             <ClipboardList className="w-4 h-4 mr-2" />
             Nova OS
@@ -212,7 +203,7 @@ export default function DashboardAdmin() {
         <KpiCard title="Gastos" value={stats.gastos} hint="Mês atual" icon="money" />
       </div>
 
-      {/* Corpo principal: Calendário + Alertas / Próximas */}
+      {/* Calendário + Lateral */}
       <div className="grid grid-cols-12 gap-4">
         {/* Calendário */}
         <Card className="col-span-12 lg:col-span-8">
@@ -229,7 +220,7 @@ export default function DashboardAdmin() {
             </div>
           </CardHeader>
           <CardContent>
-            <MiniCalendar onOpenAgenda={(iso) => nav(`/agenda${iso ? `?date=${iso}` : ''}`)} view="listWeek" events={eventos} />
+            <MiniCalendar onOpenAgenda={(iso) => nav(`/agenda${iso ? `?date=${iso}` : ""}`)} view="listWeek" events={eventos} />
           </CardContent>
         </Card>
 
@@ -285,9 +276,8 @@ export default function DashboardAdmin() {
         </div>
       </div>
 
-      {/* OS recentes + Acesso rápido a relatórios / conformidade */}
+      {/* OS recentes + Acesso rápido */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* OS Recentes */}
         <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Ordens de Serviço Recentes</CardTitle>
@@ -332,7 +322,6 @@ export default function DashboardAdmin() {
           </CardContent>
         </Card>
 
-        {/* Acesso rápido */}
         <Card>
           <CardHeader>
             <CardTitle>Acesso Rápido</CardTitle>
