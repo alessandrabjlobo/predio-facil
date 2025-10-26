@@ -18,4 +18,3 @@ export default function OwnerGuard({ children }: { children: React.ReactNode }) 
   if (!ok) return <div className="p-6 text-red-600">Acesso negado (apenas dono do sistema).</div>;
   return <>{children}</>;
 }
-
