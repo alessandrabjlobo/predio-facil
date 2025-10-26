@@ -11,6 +11,19 @@ import type {
   ConfAcao
 } from "./types";
 
+// src/lib/api.ts
+import { supabase } from "@/integrations/supabase/client";
+import type {
+  Papel,
+  Status,
+  Prioridade,
+  ManutTipo,
+  ExecStatus,
+  ConfTipo,
+  Semaforo,
+  ConfAcao
+} from "./types";
+
 export type { Papel, Status, Prioridade, ManutTipo, ExecStatus, ConfTipo, Semaforo, ConfAcao };
 
 export type NovoChamadoInput = {
@@ -23,44 +36,343 @@ export type NovoChamadoInput = {
   categoria?: string | null;
 };
 
-// ... resto do arquivo permanece igual
-export type Prioridade = "baixa" | "media" | "alta" | "urgente";
+/* ===========================
+ * Helpers
+ * =========================== */
+function normalizeStatus(s?: string | null): Status | undefined {
+  if (!s) return undefined;
+  const k = s.toLowerCase().trim();
+  const map: Record<string, Status> = {
+    aberto: "aberto",
+    em_andamento: "em_andamento",
+    "em andamento": "em_andamento",
+    concluido: "concluido",
+    concluído: "concluido",
+    cancelado: "cancelado",
+  };
+  return map[k];
+}
 
-export type NovoChamadoInput = {
-  titulo: string;
-  descricao?: string;
-  prioridade?: Prioridade;
-  condominio_id?: string;
-  ativo_id?: string;
-  local?: string | null;
-  categoria?: string | null;
-};
+function normalizePrioridade(p?: string | null): Prioridade | undefined {
+  if (!p) return undefined;
+  const k = p.toLowerCase().trim();
+  const map: Record<string, Prioridade> = {
+    baixa: "baixa",
+    media: "media",
+    média: "media",
+    alta: "alta",
+    urgente: "urgente",
+  };
+  return map[k];
+}
+
+/* slug util */
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
 
 /* ===========================
- * Tipos Manutenção/Conformidade
+ * Perfil
  * =========================== */
-export type ManutTipo = "preventiva" | "preditiva" | "corretiva";
-export type ExecStatus =
-  | "pendente"
-  | "em_execucao"
-  | "concluida"
-  | "cancelada";
+export async function getOrCreatePerfil() {
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth?.user;
+  if (!user) throw new Error("Usuário não autenticado");
 
-export type ConfTipo =
-  | "elevadores"
-  | "spda"
-  | "incendio"
-  | "reservatorios"
-  | "pmoc"
-  | "inspecao_predial"
-  | "eletrica"
-  | "gas"
-  | "brigada";
+  const { data: perfilExistente, error: eSel } = await supabase
+    .from("usuarios")
+    .select("*")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (eSel) throw eSel;
+  if (perfilExistente) return perfilExistente;
 
-export type Semaforo = "verde" | "amarelo" | "vermelho";
+  const nomeMeta =
+    (user.user_metadata?.nome as string) ||
+    (user.user_metadata?.name as string) ||
+    user.email?.split("@")[0] ||
+    "Usuario";
+  const papelMeta = (user.user_metadata?.papel as Papel) || "morador";
 
-/** ações do log de conformidade */
-export type ConfAcao = "criacao" | "edicao" | "exclusao" | "validacao" | "anexar" | "resolver" | "remarcar";
+  const { data: novo, error: eIns } = await supabase
+    .from("usuarios")
+    .insert([
+      {
+        auth_user_id: user.id,
+        email: user.email,
+        nome: nomeMeta,
+        papel: papelMeta,
+      },
+    ])
+    .select()
+    .single();
+  if (eIns) throw eIns;
+  return novo;
+}
+
+/** Versão tolerante: retorna null se não houver sessão ainda */
+export async function getPerfil() {
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth?.user;
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("*")
+    .eq("auth_user_id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return getOrCreatePerfil();
+  return data;
+}
+
+/* ===========================
+ * Chamados
+ * =========================== */
+export async function listChamados() {
+  const { data, error, status } = await supabase
+    .from("chamados")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (!error) return data ?? [];
+  if (status === 400) {
+    const { data: d2, error: e2 } = await supabase.from("chamados").select("*");
+    if (e2) throw e2;
+    return (d2 ?? []).sort((a: any, b: any) => {
+      const ta = new Date(
+        a.created_at ?? a.criado_em ?? a.updated_at ?? 0
+      ).getTime();
+      const tb = new Date(
+        b.created_at ?? b.criado_em ?? b.updated_at ?? 0
+      ).getTime();
+      return tb - ta;
+    });
+  }
+  throw error;
+}
+
+export async function getChamado(id: string) {
+  const { data, error } = await supabase
+    .from("chamados")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Chamado não encontrado");
+  return data;
+}
+
+export async function createChamado(input: NovoChamadoInput) {
+  const perfil = await getOrCreatePerfil();
+  const prioridade =
+    normalizePrioridade(input.prioridade ?? "baixa") ?? "baixa";
+
+  const payload: any = {
+    titulo: input.titulo,
+    descricao: input.descricao ?? null,
+    prioridade,
+    status: "aberto" as Status,
+    criado_por: perfil.id,
+    criado_em: new Date().toISOString(),
+  };
+  if (input.condominio_id) payload.condominio_id = input.condominio_id;
+  if (input.ativo_id) payload.ativo_id = input.ativo_id;
+  if (typeof input.local !== "undefined") payload.local = input.local;
+  if (typeof input.categoria !== "undefined") payload.categoria = input.categoria;
+
+  const { data, error } = await supabase
+    .from("chamados")
+    .insert([payload])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateChamado(
+  id: string,
+  patch: Partial<{
+    titulo: string;
+    descricao: string;
+    prioridade: Prioridade | string;
+    status: Status | string;
+    condominio_id: string;
+    ativo_id: string;
+    local: string | null;
+    categoria: string | null;
+  }>
+) {
+  const update: any = {};
+  if (typeof patch.titulo !== "undefined") update.titulo = patch.titulo ?? null;
+  if (typeof patch.descricao !== "undefined")
+    update.descricao = patch.descricao ?? null;
+  if (typeof patch.prioridade !== "undefined") {
+    const p = normalizePrioridade(patch.prioridade as string);
+    if (!p) throw new Error("Prioridade inválida");
+    update.prioridade = p;
+  }
+  if (typeof patch.status !== "undefined") {
+    const s = normalizeStatus(patch.status as string);
+    if (!s) throw new Error("Status inválido");
+    update.status = s;
+  }
+  if (typeof patch.condominio_id !== "undefined")
+    update.condominio_id = patch.condominio_id ?? null;
+  if (typeof patch.ativo_id !== "undefined")
+    update.ativo_id = patch.ativo_id ?? null;
+  if (typeof patch.local !== "undefined") update.local = patch.local;
+  if (typeof patch.categoria !== "undefined") update.categoria = patch.categoria;
+
+  update.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("chamados")
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    console.error("updateChamado erro:", error);
+    throw new Error(error.message);
+  }
+  return data;
+}
+
+/* ===========================
+ * Storage: Anexos dos chamados
+ * =========================== */
+export async function uploadAnexo(chamadoId: string, file: File) {
+  const ext = file.name.split(".").pop();
+  const path = `chamados/${chamadoId}/${Date.now()}.${ext}`;
+  const { error: eUp } = await supabase.storage
+    .from("anexos")
+    .upload(path, file, { upsert: false });
+  if (eUp) throw eUp;
+  const { data: signed } = await supabase.storage
+    .from("anexos")
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+  return { path, url: signed?.signedUrl };
+}
+
+export async function listAnexos(chamadoId: string) {
+  const { data, error } = await supabase.storage
+    .from("anexos")
+    .list(`chamados/${chamadoId}`);
+  if (error) return [];
+  const files = data ?? [];
+  const signed = await Promise.all(
+    files.map(async (f) => {
+      const key = `chamados/${chamadoId}/${f.name}`;
+      const { data: s } = await supabase.storage
+        .from("anexos")
+        .createSignedUrl(key, 60 * 60);
+      return { name: f.name, url: s?.signedUrl as string | undefined };
+    })
+  );
+  return signed.filter((x) => x.url) as { name: string; url: string }[];
+}
+
+/* ===========================
+ * ATIVOS
+ * =========================== */
+export async function listAtivos() {
+  try {
+    const { data, error } = await supabase
+      .from("ativos")
+      .select(`
+        *,
+        ativo_tipos!ativos_tipo_id_fkey(nome, slug)
+      `)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((a: any) => ({
+      ...a,
+      tipo: a.ativo_tipos?.nome ?? a.tipo ?? "Outros",
+    }));
+  } catch (_e) {
+    const { data: d2, error: e2 } = await supabase.from("ativos").select("*");
+    if (e2) throw e2;
+    return (d2 ?? []).sort((a: any, b: any) => {
+      const ta = new Date(a.created_at ?? a.inserted_at ?? a.updated_at ?? 0).getTime();
+      const tb = new Date(b.created_at ?? b.inserted_at ?? b.updated_at ?? 0).getTime();
+      return tb - ta;
+    });
+  }
+}
+
+export async function createAtivo(payload: { nome: string; tipo: string; local?: string }) {
+  const { data: ativo, error } = await supabase.from("ativos").insert(payload).select().single();
+  if (error) throw error;
+
+  try {
+    const templates = await listTemplatesBySistema(payload.tipo);
+    if (templates.length > 0) {
+      const hoje = new Date().toISOString().slice(0, 10);
+      const rows = templates.map((t: any) => ({
+        ativo_id: ativo.id,
+        titulo: t.titulo_plano,
+        tipo: "preventiva",
+        periodicidade: t.periodicidade as any,
+        proxima_execucao: hoje,
+        checklist: t.checklist ?? [],
+        responsavel: t.responsavel ?? "sindico",
+      }));
+      for (const r of rows) {
+        const { data: ja } = await supabase
+          .from("planos_manutencao")
+          .select("id")
+          .eq("ativo_id", r.ativo_id)
+          .eq("titulo", r.titulo)
+          .maybeSingle();
+        if (!ja) {
+          const { error: eIns } = await supabase.from("planos_manutencao").insert(r as any);
+          if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Templates não aplicados:", (e as any)?.message);
+  }
+
+  return ativo;
+}
+
+export async function updateAtivo(
+  id: string,
+  patch: Partial<{ nome: string; tipo: string; local: string | null }>
+) {
+  const update: any = {};
+  if (typeof patch.nome !== "undefined") update.nome = patch.nome ?? null;
+  if (typeof patch.tipo !== "undefined") update.tipo = patch.tipo ?? null;
+  if (typeof patch.local !== "undefined") update.local = patch.local ?? null;
+
+  const { data, error } = await supabase
+    .from("ativos")
+    .update(update)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/** Exclui: manutencoes -> planos -> ativo (ordem segura contra FKs) */
+export async function deleteAtivoAndRelated(ativoId: string) {
+  const { error: eMan } = await supabase.from("manutencoes").delete().eq("ativo_id", ativoId);
+  if (eMan) throw eMan;
+
+  const { error: ePlan } = await supabase.from("planos_manutencao").delete().eq("ativo_id", ativoId);
+  if (ePlan) throw ePlan;
+
+  const { error: eAtivo } = await supabase.from("ativos").delete().eq("id", ativoId);
+  if (eAtivo) throw eAtivo;
+}
 
 /* ===========================
  * Helpers
