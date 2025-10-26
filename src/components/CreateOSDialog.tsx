@@ -57,24 +57,24 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
 
     const ativo = ativos?.find(a => a.id === ativoId);
 
-    await createOS.mutateAsync({
-      titulo,
-      descricao,
-      ativoId,
-      planoId: initialData?.planoId,
-      tipo,
-      prioridade,
-      dataPrevista: dataPrevista?.toISOString().split('T')[0],
-      slaDias: parseInt(slaDias),
-      local: ativo?.local,
-      tipoExecutor,
-      executanteId: tipoExecutor === "interno" ? executanteId : undefined,
-      executorNome: tipoExecutor === "externo" ? executorNome : undefined,
-      executorContato: tipoExecutor === "externo" ? executorContato : undefined,
-      executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
-      executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
-      custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
-    });
+  await createOS.mutateAsync({
+  titulo,
+  descricao,
+  ativoId,
+  planoId: initialData?.planoId,
+  tipo,
+  prioridade,
+  dataPrevista: dataPrevista?.toISOString().split('T')[0],
+  slaDias: parseInt(slaDias),
+  tipoExecutor,
+  executanteId: tipoExecutor === "interno" ? executanteId : undefined,
+  executorNome: tipoExecutor === "externo" ? executorNome : undefined,
+  executorContato: tipoExecutor === "externo" ? executorContato : undefined,
+  executorEmpresa: tipoExecutor === "externo" ? executorEmpresa : undefined,
+  executorCnpj: tipoExecutor === "externo" ? executorCnpj : undefined,
+  custoPrevisto: custoPrevisto ? parseFloat(custoPrevisto) : undefined,
+});
+
 
     onOpenChange(false);
     resetForm();
