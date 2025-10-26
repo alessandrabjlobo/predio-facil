@@ -5,6 +5,7 @@ import TabsContainer from "@/components/patterns/TabsContainer";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Download, ClipboardList } from "lucide-react";
 import OSList, { OSListHandle } from "@/components/os/OSList";
+import OSKanban from "@/components/os/OSKanban";
 
 export default function OSPage() {
   const listRef = useRef<OSListHandle | null>(null);
@@ -23,8 +24,8 @@ export default function OSPage() {
       id: "kanban",
       label: "Kanban",
       content: (
-        <div className="p-6 text-center text-muted-foreground">
-          Kanban: A Fazer | Em Execução | A Aprovar | Concluída (implementar)
+        <div className="p-0">
+          <OSKanban />
         </div>
       ),
     },
@@ -46,11 +47,7 @@ export default function OSPage() {
         subtitle="Gerencie e acompanhe todas as ordens de serviço"
         actions={
           <>
-            <Button
-              variant="outline"
-              onClick={() => listRef.current?.exportarCSV?.()}
-              title="Exportar CSV da lista atual"
-            >
+            <Button variant="outline" onClick={() => listRef.current?.exportarCSV?.()}>
               <Download className="h-4 w-4 mr-2" />
               Exportar
             </Button>
