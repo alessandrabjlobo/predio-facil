@@ -1,4 +1,4 @@
-// src/lib/api.ts
+// FILE: src/lib/api.ts
 import { supabase } from "@/integrations/supabase/client";
 import type {
   Papel,
@@ -8,12 +8,10 @@ import type {
   ExecStatus,
   ConfTipo,
   Semaforo,
-  ConfAcao
+  ConfAcao,
 } from "./types";
 
-// src/lib/api.ts
-import { supabase } from "@/integrations/supabase/client";
-import type {
+export type {
   Papel,
   Status,
   Prioridade,
@@ -21,10 +19,8 @@ import type {
   ExecStatus,
   ConfTipo,
   Semaforo,
-  ConfAcao
-} from "./types";
-
-export type { Papel, Status, Prioridade, ManutTipo, ExecStatus, ConfTipo, Semaforo, ConfAcao };
+  ConfAcao,
+};
 
 export type NovoChamadoInput = {
   titulo: string;
@@ -284,10 +280,12 @@ export async function listAtivos() {
   try {
     const { data, error } = await supabase
       .from("ativos")
-      .select(`
+      .select(
+        `
         *,
         ativo_tipos!ativos_tipo_id_fkey(nome, slug)
-      `)
+      `
+      )
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map((a: any) => ({
@@ -296,355 +294,29 @@ export async function listAtivos() {
     }));
   } catch (_e) {
     const { data: d2, error: e2 } = await supabase.from("ativos").select("*");
-    if (e2) throw e2;
-    return (d2 ?? []).sort((a: any, b: any) => {
-      const ta = new Date(a.created_at ?? a.inserted_at ?? a.updated_at ?? 0).getTime();
-      const tb = new Date(b.created_at ?? b.inserted_at ?? b.updated_at ?? 0).getTime();
-      return tb - ta;
-    });
-  }
-}
-
-export async function createAtivo(payload: { nome: string; tipo: string; local?: string }) {
-  const { data: ativo, error } = await supabase.from("ativos").insert(payload).select().single();
-  if (error) throw error;
-
-  try {
-    const templates = await listTemplatesBySistema(payload.tipo);
-    if (templates.length > 0) {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const rows = templates.map((t: any) => ({
-        ativo_id: ativo.id,
-        titulo: t.titulo_plano,
-        tipo: "preventiva",
-        periodicidade: t.periodicidade as any,
-        proxima_execucao: hoje,
-        checklist: t.checklist ?? [],
-        responsavel: t.responsavel ?? "sindico",
-      }));
-      for (const r of rows) {
-        const { data: ja } = await supabase
-          .from("planos_manutencao")
-          .select("id")
-          .eq("ativo_id", r.ativo_id)
-          .eq("titulo", r.titulo)
-          .maybeSingle();
-        if (!ja) {
-          const { error: eIns } = await supabase.from("planos_manutencao").insert(r as any);
-          if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("Templates não aplicados:", (e as any)?.message);
-  }
-
-  return ativo;
-}
-
-export async function updateAtivo(
-  id: string,
-  patch: Partial<{ nome: string; tipo: string; local: string | null }>
-) {
-  const update: any = {};
-  if (typeof patch.nome !== "undefined") update.nome = patch.nome ?? null;
-  if (typeof patch.tipo !== "undefined") update.tipo = patch.tipo ?? null;
-  if (typeof patch.local !== "undefined") update.local = patch.local ?? null;
-
-  const { data, error } = await supabase
-    .from("ativos")
-    .update(update)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-/** Exclui: manutencoes -> planos -> ativo (ordem segura contra FKs) */
-export async function deleteAtivoAndRelated(ativoId: string) {
-  const { error: eMan } = await supabase.from("manutencoes").delete().eq("ativo_id", ativoId);
-  if (eMan) throw eMan;
-
-  const { error: ePlan } = await supabase.from("planos_manutencao").delete().eq("ativo_id", ativoId);
-  if (ePlan) throw ePlan;
-
-  const { error: eAtivo } = await supabase.from("ativos").delete().eq("id", ativoId);
-  if (eAtivo) throw eAtivo;
-}
-
-/* ===========================
- * Helpers
- * =========================== */
-function normalizeStatus(s?: string | null): Status | undefined {
-  if (!s) return undefined;
-  const k = s.toLowerCase().trim();
-  const map: Record<string, Status> = {
-    aberto: "aberto",
-    em_andamento: "em_andamento",
-    "em andamento": "em_andamento",
-    concluido: "concluido",
-    concluído: "concluido",
-    cancelado: "cancelado",
-  };
-  return map[k];
-}
-
-function normalizePrioridade(p?: string | null): Prioridade | undefined {
-  if (!p) return undefined;
-  const k = p.toLowerCase().trim();
-  const map: Record<string, Prioridade> = {
-    baixa: "baixa",
-    media: "media",
-    média: "media",
-    alta: "alta",
-    urgente: "urgente",
-  };
-  return map[k];
-}
-
-/* slug util */
-function slugify(s: string) {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-}
-
-/* ===========================
- * Perfil
- * =========================== */
-export async function getOrCreatePerfil() {
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
-  if (!user) throw new Error("Usuário não autenticado");
-
-  const { data: perfilExistente, error: eSel } = await supabase
-    .from("usuarios")
-    .select("*")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (eSel) throw eSel;
-  if (perfilExistente) return perfilExistente;
-
-  const nomeMeta =
-    (user.user_metadata?.nome as string) ||
-    (user.user_metadata?.name as string) ||
-    user.email?.split("@")[0] ||
-    "Usuario";
-  const papelMeta = (user.user_metadata?.papel as Papel) || "morador";
-
-  const { data: novo, error: eIns } = await supabase
-    .from("usuarios")
-    .insert([
-      {
-        auth_user_id: user.id,
-        email: user.email,
-        nome: nomeMeta,
-        papel: papelMeta,
-      },
-    ])
-    .select()
-    .single();
-  if (eIns) throw eIns;
-  return novo;
-}
-
-/** Versão tolerante: retorna null se não houver sessão ainda */
-export async function getPerfil() {
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth?.user;
-  if (!user) return null;
-
-  const { data, error } = await supabase
-    .from("usuarios")
-    .select("*")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return getOrCreatePerfil();
-  return data;
-}
-
-/* ===========================
- * Chamados
- * =========================== */
-export async function listChamados() {
-  const { data, error, status } = await supabase
-    .from("chamados")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (!error) return data ?? [];
-  if (status === 400) {
-    const { data: d2, error: e2 } = await supabase.from("chamados").select("*");
     if (e2) throw e2;
     return (d2 ?? []).sort((a: any, b: any) => {
       const ta = new Date(
-        a.created_at ?? a.criado_em ?? a.updated_at ?? 0
+        a.created_at ?? a.inserted_at ?? a.updated_at ?? 0
       ).getTime();
       const tb = new Date(
-        b.created_at ?? b.criado_em ?? b.updated_at ?? 0
+        b.created_at ?? b.inserted_at ?? b.updated_at ?? 0
       ).getTime();
       return tb - ta;
     });
   }
-  throw error;
 }
 
-export async function getChamado(id: string) {
-  const { data, error } = await supabase
-    .from("chamados")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("Chamado não encontrado");
-  return data;
-}
-
-export async function createChamado(input: NovoChamadoInput) {
-  const perfil = await getOrCreatePerfil();
-  const prioridade =
-    normalizePrioridade(input.prioridade ?? "baixa") ?? "baixa";
-
-  const payload: any = {
-    titulo: input.titulo,
-    descricao: input.descricao ?? null,
-    prioridade,
-    status: "aberto" as Status,
-    criado_por: perfil.id,
-    criado_em: new Date().toISOString(),
-  };
-  if (input.condominio_id) payload.condominio_id = input.condominio_id;
-  if (input.ativo_id) payload.ativo_id = input.ativo_id;
-  if (typeof input.local !== "undefined") payload.local = input.local;
-  if (typeof input.categoria !== "undefined") payload.categoria = input.categoria;
-
-  const { data, error } = await supabase
-    .from("chamados")
-    .insert([payload])
+export async function createAtivo(payload: {
+  nome: string;
+  tipo: string;
+  local?: string;
+}) {
+  const { data: ativo, error } = await supabase
+    .from("ativos")
+    .insert(payload)
     .select()
     .single();
-  if (error) throw error;
-  return data;
-}
-
-export async function updateChamado(
-  id: string,
-  patch: Partial<{
-    titulo: string;
-    descricao: string;
-    prioridade: Prioridade | string;
-    status: Status | string;
-    condominio_id: string;
-    ativo_id: string;
-    local: string | null;
-    categoria: string | null;
-  }>
-) {
-  const update: any = {};
-  if (typeof patch.titulo !== "undefined") update.titulo = patch.titulo ?? null;
-  if (typeof patch.descricao !== "undefined")
-    update.descricao = patch.descricao ?? null;
-  if (typeof patch.prioridade !== "undefined") {
-    const p = normalizePrioridade(patch.prioridade as string);
-    if (!p) throw new Error("Prioridade inválida");
-    update.prioridade = p;
-  }
-  if (typeof patch.status !== "undefined") {
-    const s = normalizeStatus(patch.status as string);
-    if (!s) throw new Error("Status inválido");
-    update.status = s;
-  }
-  if (typeof patch.condominio_id !== "undefined")
-    update.condominio_id = patch.condominio_id ?? null;
-  if (typeof patch.ativo_id !== "undefined")
-    update.ativo_id = patch.ativo_id ?? null;
-  if (typeof patch.local !== "undefined") update.local = patch.local;
-  if (typeof patch.categoria !== "undefined") update.categoria = patch.categoria;
-
-  update.updated_at = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from("chamados")
-    .update(update)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) {
-    console.error("updateChamado erro:", error);
-    throw new Error(error.message);
-  }
-  return data;
-}
-
-/* ===========================
- * Storage: Anexos dos chamados
- * =========================== */
-export async function uploadAnexo(chamadoId: string, file: File) {
-  const ext = file.name.split(".").pop();
-  const path = `chamados/${chamadoId}/${Date.now()}.${ext}`;
-  const { error: eUp } = await supabase.storage
-    .from("anexos")
-    .upload(path, file, { upsert: false });
-  if (eUp) throw eUp;
-  const { data: signed } = await supabase.storage
-    .from("anexos")
-    .createSignedUrl(path, 60 * 60 * 24 * 7);
-  return { path, url: signed?.signedUrl };
-}
-
-export async function listAnexos(chamadoId: string) {
-  const { data, error } = await supabase.storage
-    .from("anexos")
-    .list(`chamados/${chamadoId}`);
-  if (error) return [];
-  const files = data ?? [];
-  const signed = await Promise.all(
-    files.map(async (f) => {
-      const key = `chamados/${chamadoId}/${f.name}`;
-      const { data: s } = await supabase.storage
-        .from("anexos")
-        .createSignedUrl(key, 60 * 60);
-      return { name: f.name, url: s?.signedUrl as string | undefined };
-    })
-  );
-  return signed.filter((x) => x.url) as { name: string; url: string }[];
-}
-
-/* ===========================
- * ATIVOS
- * =========================== */
-export async function listAtivos() {
-  try {
-    const { data, error } = await supabase
-      .from("ativos")
-      .select(`
-        *,
-        ativo_tipos!ativos_tipo_id_fkey(nome, slug)
-      `)
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map((a: any) => ({
-      ...a,
-      tipo: a.ativo_tipos?.nome ?? a.tipo ?? "Outros",
-    }));
-  } catch (_e) {
-    const { data: d2, error: e2 } = await supabase.from("ativos").select("*");
-    if (e2) throw e2;
-    return (d2 ?? []).sort((a: any, b: any) => {
-      const ta = new Date(a.created_at ?? a.inserted_at ?? a.updated_at ?? 0).getTime();
-      const tb = new Date(b.created_at ?? b.inserted_at ?? b.updated_at ?? 0).getTime();
-      return tb - ta;
-    });
-  }
-}
-
-export async function createAtivo(payload: { nome: string; tipo: string; local?: string }) {
-  const { data: ativo, error } = await supabase.from("ativos").insert(payload).select().single();
   if (error) throw error;
 
   try {
@@ -668,7 +340,9 @@ export async function createAtivo(payload: { nome: string; tipo: string; local?:
           .eq("titulo", r.titulo)
           .maybeSingle();
         if (!ja) {
-          const { error: eIns } = await supabase.from("planos_manutencao").insert(r as any);
+          const { error: eIns } = await supabase
+            .from("planos_manutencao")
+            .insert(r as any);
           if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
         }
       }
@@ -702,13 +376,22 @@ export async function updateAtivo(
 
 /** Exclui: manutencoes -> planos -> ativo (ordem segura contra FKs) */
 export async function deleteAtivoAndRelated(ativoId: string) {
-  const { error: eMan } = await supabase.from("manutencoes").delete().eq("ativo_id", ativoId);
+  const { error: eMan } = await supabase
+    .from("manutencoes")
+    .delete()
+    .eq("ativo_id", ativoId);
   if (eMan) throw eMan;
 
-  const { error: ePlan } = await supabase.from("planos_manutencao").delete().eq("ativo_id", ativoId);
+  const { error: ePlan } = await supabase
+    .from("planos_manutencao")
+    .delete()
+    .eq("ativo_id", ativoId);
   if (ePlan) throw ePlan;
 
-  const { error: eAtivo } = await supabase.from("ativos").delete().eq("id", ativoId);
+  const { error: eAtivo } = await supabase
+    .from("ativos")
+    .delete()
+    .eq("id", ativoId);
   if (eAtivo) throw eAtivo;
 }
 
@@ -761,7 +444,10 @@ export async function createPlano(payload: {
 }
 
 // ========= Garante plano preventivo default por tipo de ativo =========
-export async function ensureDefaultPlanoParaAtivo(ativo: { id: string; tipo: string }) {
+export async function ensureDefaultPlanoParaAtivo(ativo: {
+  id: string;
+  tipo: string;
+}) {
   const slug = slugify(ativo.tipo || "");
   let periodicidadeDefault: string | null = null;
 
@@ -772,7 +458,8 @@ export async function ensureDefaultPlanoParaAtivo(ativo: { id: string; tipo: str
       .eq("slug", slug)
       .maybeSingle();
     if (error && (error as any).code !== "PGRST116") throw error;
-    if (data?.periodicidade_default) periodicidadeDefault = data.periodicidade_default;
+    if (data?.periodicidade_default)
+      periodicidadeDefault = data.periodicidade_default;
   }
 
   if (!periodicidadeDefault) {
@@ -782,7 +469,8 @@ export async function ensureDefaultPlanoParaAtivo(ativo: { id: string; tipo: str
       .eq("nome", ativo.tipo)
       .maybeSingle();
     if (error && (error as any).code !== "PGRST116") throw error;
-    if (data?.periodicidade_default) periodicidadeDefault = data.periodicidade_default;
+    if (data?.periodicidade_default)
+      periodicidadeDefault = data.periodicidade_default;
   }
 
   if (!periodicidadeDefault) return null;
@@ -832,10 +520,14 @@ export type DashManutRow = {
   ativo_nome?: string | null;
 };
 
-export async function listUpcomingManutencoes(limit = 50): Promise<DashManutRow[]> {
+export async function listUpcomingManutencoes(
+  limit = 50
+): Promise<DashManutRow[]> {
   const { data, error } = await supabase
     .from("manutencoes")
-    .select("id,titulo,tipo,status,vencimento,ativo_id,ativos:ativo_id(id,nome)")
+    .select(
+      "id,titulo,tipo,status,vencimento,ativo_id,ativos:ativo_id(id,nome)"
+    )
     .in("status", ["pendente", "em_execucao"])
     .order("vencimento", { ascending: true, nullsFirst: false })
     .limit(limit);
@@ -901,7 +593,9 @@ export async function scheduleFromPlano(plano_id: string) {
   const isConflict =
     status === 409 ||
     (error as any)?.code === "23505" ||
-    /duplicate key|unique constraint/i.test((error as any)?.message || "");
+    /duplicate key|unique constraint/i.test(
+      (error as any)?.message || ""
+    );
 
   if (isConflict) {
     const { data: ja, error: eSel } = await supabase
@@ -917,7 +611,10 @@ export async function scheduleFromPlano(plano_id: string) {
   throw error;
 }
 
-export async function concluirManutencao(id: string, anexo_path?: string) {
+export async function concluirManutencao(
+  id: string,
+  anexo_path?: string
+) {
   const { data, error } = await supabase
     .from("manutencoes")
     .update({
@@ -962,7 +659,9 @@ export async function listManutencoesAgenda(params?: {
   const { from, to } = params || {};
   let query = supabase
     .from("manutencoes")
-    .select("id,titulo,tipo,status,vencimento,ativo_id,ativos:ativo_id(id,nome)")
+    .select(
+      "id,titulo,tipo,status,vencimento,ativo_id,ativos:ativo_id(id,nome)"
+    )
     .order("vencimento", { ascending: true, nullsFirst: false });
 
   if (from) query = query.gte("vencimento", from);
@@ -971,23 +670,26 @@ export async function listManutencoesAgenda(params?: {
   const { data, error } = await query;
   if (error) throw error;
 
-  return (data ?? []).map((r: any) => ({
-    id: r.id,
-    titulo: r.titulo,
-    tipo: r.tipo,
-    status: r.status as ExecStatus,
-    vencimento: r.vencimento as string | null | undefined,
-    ativo_id: r.ativo_id ?? null,
-    ativo_nome: r.ativos?.nome ?? null,
-  })) as Array<{
-    id: string;
-    titulo: string;
-    tipo: string;
-    status: ExecStatus;
-    vencimento?: string | null;
-    ativo_id?: string | null;
-    ativo_nome?: string | null;
-  }>;
+  return (data ?? []).map(
+    (r: any) =>
+      ({
+        id: r.id,
+        titulo: r.titulo,
+        tipo: r.tipo,
+        status: r.status as ExecStatus,
+        vencimento: r.vencimento as string | null | undefined,
+        ativo_id: r.ativo_id ?? null,
+        ativo_nome: r.ativos?.nome ?? null,
+      } as {
+        id: string;
+        titulo: string;
+        tipo: string;
+        status: ExecStatus;
+        vencimento?: string | null;
+        ativo_id?: string | null;
+        ativo_nome?: string | null;
+      })
+  );
 }
 
 /* ===========================
@@ -1006,7 +708,7 @@ export async function listConformidadeItens() {
 export async function upsertConformidadeItem(payload: {
   id?: string;
   tipo: ConfTipo | string;
-  periodicidade: string;   // interval textual, e.g. '1 month' | '90 days'
+  periodicidade: string; // interval textual
   ultimo?: string | null;
   proximo: string;
   observacoes?: string | null;
@@ -1021,12 +723,20 @@ export async function upsertConformidadeItem(payload: {
   };
   const { data, error } = inserting
     ? await supabase.from("conformidade_itens").insert(base).select().single()
-    : await supabase.from("conformidade_itens").update(base).eq("id", payload.id!).select().single();
+    : await supabase
+        .from("conformidade_itens")
+        .update(base)
+        .eq("id", payload.id!)
+        .select()
+        .single();
   if (error) throw error;
   return data;
 }
 
-export async function uploadConformidadeAnexo(item_id: string, file: File) {
+export async function uploadConformidadeAnexo(
+  item_id: string,
+  file: File
+) {
   const perfil = await getOrCreatePerfil();
 
   const safeName = file.name.replace(/[^\w.\-]/g, "_");
@@ -1114,10 +824,12 @@ export async function updateConformidadeDatas(
 export async function listConformidadeLogs(item_id: string) {
   const { data, error } = await supabase
     .from("conformidade_logs")
-    .select(`
+    .select(
+      `
       id, item_id, usuario_id, acao, detalhes, created_at,
       actor:usuarios ( id, nome, email )
-    `)
+    `
+    )
     .eq("item_id", item_id)
     .order("created_at", { ascending: false });
 
@@ -1148,17 +860,21 @@ export async function logConformidadeAcao(
   detalhes?: any
 ) {
   const perfil = await getOrCreatePerfil();
-  const acaoValida: "criacao" | "edicao" | "exclusao" | "validacao" = 
-    (acao === "anexar" || acao === "resolver" || acao === "remarcar") ? "edicao" : acao as any;
-  
+  const acaoValida: "criacao" | "edicao" | "exclusao" | "validacao" =
+    acao === "anexar" || acao === "resolver" || acao === "remarcar"
+      ? "edicao"
+      : (acao as any);
+
   const { data, error } = await supabase
     .from("conformidade_logs")
-    .insert([{
-      item_id,
-      usuario_id: perfil.id,
-      acao: acaoValida,
-      detalhes: detalhes ?? {},
-    }])
+    .insert([
+      {
+        item_id,
+        usuario_id: perfil.id,
+        acao: acaoValida,
+        detalhes: detalhes ?? {},
+      },
+    ])
     .select()
     .single();
   if (error) throw error;
@@ -1192,7 +908,11 @@ export async function registrarExecucaoConformidade(
   return data;
 }
 
-export async function adiarProximoConformidade(itemId: string, novaData: string, motivo?: string) {
+export async function adiarProximoConformidade(
+  itemId: string,
+  novaData: string,
+  motivo?: string
+) {
   const { data, error } = await supabase.rpc("conf_adiar_proximo", {
     p_item_id: itemId,
     p_nova_data: novaData,
@@ -1203,10 +923,14 @@ export async function adiarProximoConformidade(itemId: string, novaData: string,
 }
 
 /* ===========================
- * MÓDULO DE OS (Ordem de Serviço) — tolerant
+ * MÓDULO DE OS (Ordem de Serviço)
  * =========================== */
 
-export type OSStatus = "aberta" | "em andamento" | "concluida" | "cancelada";
+export type OSStatus =
+  | "aberta"
+  | "em andamento"
+  | "concluida"
+  | "cancelada";
 
 export type OSRow = {
   id: string;
@@ -1218,11 +942,11 @@ export type OSRow = {
 
   created_at?: string | null;
   updated_at?: string | null;
-  data_abertura?: string | null;    // opcional no DB – UI usa se existir
-  data_fechamento?: string | null;  // opcional no DB – UI usa se existir
+  data_abertura?: string | null; // opcional no DB – UI usa se existir
+  data_fechamento?: string | null; // opcional no DB – UI usa se existir
 
   pdf_path?: string | null; // no bucket os_docs
-  pdf_url?: string | null;  // URL assinada calculada
+  pdf_url?: string | null; // URL assinada calculada
 };
 
 /** normaliza status vindo do DB (aceita 'em_andamento' OU 'em andamento') */
@@ -1249,7 +973,6 @@ export async function listOS(params?: {
 }): Promise<OSRow[]> {
   const { status, ativo_id, search, limit = 100 } = params ?? {};
 
-  // tenta com order(created_at); se 400, refaz sem o order
   const run = async (useOrder: boolean) => {
     let q = supabase.from("os").select("*").limit(limit);
     if (useOrder) q = q.order("created_at", { ascending: false });
@@ -1264,7 +987,6 @@ export async function listOS(params?: {
 
   let { data, error, status: http } = await run(true);
   if (error && http === 400) {
-    // fallback sem order
     ({ data, error } = await run(false));
   }
   if (error) throw error;
@@ -1276,8 +998,7 @@ export async function listOS(params?: {
       let pdf_url: string | null = null;
       if (pdf_path) {
         try {
-          const { data: signed } = await supabase
-            .storage
+          const { data: signed } = await supabase.storage
             .from("os_docs")
             .createSignedUrl(pdf_path, 60 * 60);
           pdf_url = signed?.signedUrl ?? null;
@@ -1299,7 +1020,11 @@ export async function listOS(params?: {
 }
 
 export async function getOS(id: string) {
-  const { data, error } = await supabase.from("os").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await supabase
+    .from("os")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("OS não encontrada");
   const r: any = data;
@@ -1319,8 +1044,8 @@ export async function createOS(payload: {
   descricao?: string | null;
   responsavel?: string | null;
   ativo_id?: string | null;
-  origem?: string | null;      // aceito mas ignorado no insert, a não ser que sua tabela tenha a coluna
-  prioridade?: string | null;  // idem
+  origem?: string | null;
+  prioridade?: string | null;
 }) {
   const safe: any = {
     titulo: payload.titulo,
@@ -1330,10 +1055,13 @@ export async function createOS(payload: {
     status: osDbEncodeStatus("aberta"),
   };
 
-  const { data, error } = await supabase.from("os").insert(safe).select().single();
+  const { data, error } = await supabase
+    .from("os")
+    .insert(safe)
+    .select()
+    .single();
   if (error) throw error;
 
-  // tenta gravar origem/prioridade se as colunas existirem
   if (payload.origem != null || payload.prioridade != null) {
     try {
       const patch: any = {};
@@ -1355,18 +1083,27 @@ export async function createOS(payload: {
 
 export async function updateOS(
   id: string,
-  patch: Partial<Pick<OSRow, "titulo" | "descricao" | "responsavel" | "status" | "ativo_id">>
+  patch: Partial<
+    Pick<OSRow, "titulo" | "descricao" | "responsavel" | "status" | "ativo_id">
+  >
 ) {
   const upd: any = {};
   if (typeof patch.titulo !== "undefined") upd.titulo = patch.titulo ?? null;
-  if (typeof patch.descricao !== "undefined") upd.descricao = patch.descricao ?? null;
-  if (typeof patch.responsavel !== "undefined") upd.responsavel = patch.responsavel ?? null;
+  if (typeof patch.descricao !== "undefined")
+    upd.descricao = patch.descricao ?? null;
+  if (typeof patch.responsavel !== "undefined")
+    upd.responsavel = patch.responsavel ?? null;
   if (typeof patch.ativo_id !== "undefined") upd.ativo_id = patch.ativo_id ?? null;
   if (typeof patch.status !== "undefined") upd.status = osDbEncodeStatus(patch.status);
 
   upd.updated_at = new Date().toISOString();
 
-  const { data, error } = await supabase.from("os").update(upd).eq("id", id).select().single();
+  const { data, error } = await supabase
+    .from("os")
+    .update(upd)
+    .eq("id", id)
+    .select()
+    .single();
   if (error) throw error;
   const r: any = data;
   return {
@@ -1382,7 +1119,10 @@ export async function deleteOS(id: string): Promise<void> {
 }
 
 /** Upload do PDF da OS (bucket 'os_docs') */
-export async function uploadOSPdf(id: string, file: File): Promise<{ path: string; url: string | null }> {
+export async function uploadOSPdf(
+  id: string,
+  file: File
+): Promise<{ path: string; url: string | null }> {
   const ext = (file.name.split(".").pop() || "pdf").toLowerCase();
   const key = `${id}/${Date.now()}.${ext}`;
 
@@ -1394,11 +1134,10 @@ export async function uploadOSPdf(id: string, file: File): Promise<{ path: strin
     });
   if (upErr) throw upErr;
 
-  // grava caminho no registro da OS se a coluna existir
   try {
     await supabase.from("os").update({ pdf_path: key }).eq("id", id);
   } catch {
-    // ignora se não existir
+    // coluna opcional
   }
 
   const { data: signed } = await supabase.storage
@@ -1410,12 +1149,14 @@ export async function uploadOSPdf(id: string, file: File): Promise<{ path: strin
 
 /** Gerar OS a partir da manutenção/plano (usado pelo Ativos.tsx) */
 export async function createOSFromManut(manut: {
-  id: string;                        // pode ser "plano:<id>" também
+  id: string; // pode ser "plano:<id>" também
   titulo: string;
   ativo_id?: string | null;
   vencimento?: string | null;
 }) {
-  const descricao = `OS gerada automaticamente a partir de "${manut.titulo}" (venc.: ${manut.vencimento ?? "—"})`;
+  const descricao = `OS gerada automaticamente a partir de "${manut.titulo}" (venc.: ${
+    manut.vencimento ?? "—"
+  })`;
   return createOS({
     titulo: `OS – ${manut.titulo}`,
     descricao,
@@ -1468,12 +1209,14 @@ export async function upsertCondoConfig(patch: Partial<CondoConfig>) {
   if (!current) {
     const { data, error } = await supabase
       .from("condominio_config")
-      .insert([{
-        nome: patch.nome ?? null,
-        unidades: patch.unidades ?? null,
-        endereco: patch.endereco ?? null,
-        updated_at: new Date().toISOString(),
-      }] as any)
+      .insert([
+        {
+          nome: patch.nome ?? null,
+          unidades: patch.unidades ?? null,
+          endereco: patch.endereco ?? null,
+          updated_at: new Date().toISOString(),
+        } as any,
+      ])
       .select()
       .single();
     if (error) throw error;
@@ -1482,11 +1225,16 @@ export async function upsertCondoConfig(patch: Partial<CondoConfig>) {
   const { data, error } = await supabase
     .from("condominio_config")
     .update({
-      nome: typeof patch.nome !== "undefined" ? patch.nome : current.nome,
+      nome:
+        typeof patch.nome !== "undefined" ? patch.nome : current.nome,
       unidades:
-        typeof patch.unidades !== "undefined" ? patch.unidades : current.unidades,
+        typeof patch.unidades !== "undefined"
+          ? patch.unidades
+          : current.unidades,
       endereco:
-        typeof patch.endereco !== "undefined" ? patch.endereco : current.endereco,
+        typeof patch.endereco !== "undefined"
+          ? patch.endereco
+          : current.endereco,
       updated_at: new Date().toISOString(),
     })
     .eq("id", current.id)
@@ -1507,8 +1255,14 @@ export type ManutTemplate = {
   created_at?: string | null;
 };
 
-export async function listManutTemplates(sistema?: string): Promise<ManutTemplate[]> {
-  let q = supabase.from("manut_templates").select("*").order("sistema", { ascending: true }).order("titulo_plano", { ascending: true });
+export async function listManutTemplates(
+  sistema?: string
+): Promise<ManutTemplate[]> {
+  let q = supabase
+    .from("manut_templates")
+    .select("*")
+    .order("sistema", { ascending: true })
+    .order("titulo_plano", { ascending: true });
   if (sistema && sistema.trim()) {
     q = q.ilike("sistema", sistema.trim().toLowerCase());
   }
@@ -1517,11 +1271,13 @@ export async function listManutTemplates(sistema?: string): Promise<ManutTemplat
   return (data ?? []) as ManutTemplate[];
 }
 
-export async function upsertManutTemplate(payload: Partial<ManutTemplate> & {
-  sistema: string;
-  titulo_plano: string;
-  periodicidade: string;
-}) {
+export async function upsertManutTemplate(
+  payload: Partial<ManutTemplate> & {
+    sistema: string;
+    titulo_plano: string;
+    periodicidade: string;
+  }
+) {
   const base = {
     sistema: payload.sistema.trim().toLowerCase(),
     titulo_plano: payload.titulo_plano.trim(),
@@ -1552,7 +1308,10 @@ export async function upsertManutTemplate(payload: Partial<ManutTemplate> & {
 }
 
 export async function deleteManutTemplate(id: string) {
-  const { error } = await supabase.from("manut_templates").delete().eq("id", id);
+  const { error } = await supabase
+    .from("manut_templates")
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -1562,7 +1321,7 @@ export async function listAtivoTipos(): Promise<AtivoTipoRow[]> {
     .select("*")
     .order("nome", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(d => ({
+  return (data ?? []).map((d) => ({
     ...d,
     conf_tipo: (d.conf_tipo as any) ?? null,
   })) as AtivoTipoRow[];
@@ -1623,11 +1382,16 @@ export async function updateAtivoTipo(
 }
 
 export async function deleteAtivoTipo(id: string) {
-  const { error } = await supabase.from("ativo_tipos").delete().eq("id", id);
+  const { error } = await supabase
+    .from("ativo_tipos")
+    .delete()
+    .eq("id", id);
   if (error) throw error;
 }
 
-export async function getAtivoTipoMeta(tipo: string): Promise<AtivoTipoRow | null> {
+export async function getAtivoTipoMeta(
+  tipo: string
+): Promise<AtivoTipoRow | null> {
   const s = (tipo || "").trim();
   if (!s) return null;
   const slug = slugify(s);
@@ -1651,7 +1415,9 @@ export async function getAtivoTipoMeta(tipo: string): Promise<AtivoTipoRow | nul
   return (data as AtivoTipoRow) ?? null;
 }
 
-export async function isConformidadeForTipo(tipo: string): Promise<{ is: boolean; conf_tipo: ConfTipo | null }> {
+export async function isConformidadeForTipo(
+  tipo: string
+): Promise<{ is: boolean; conf_tipo: ConfTipo | null }> {
   const meta = await getAtivoTipoMeta(tipo);
   if (!meta) return { is: false, conf_tipo: null };
   return { is: !!meta.is_conformidade, conf_tipo: meta.conf_tipo ?? null };
@@ -1702,10 +1468,15 @@ export async function listTemplatesBySistema(sistema: string) {
   return data ?? [];
 }
 
-export async function listManutencaoAnexos(manutencaoId: string): Promise<Array<{ name: string; key: string; url: string }>> {
+export async function listManutencaoAnexos(
+  manutencaoId: string
+): Promise<Array<{ name: string; key: string; url: string }>> {
   const { data, error } = await supabase.storage
     .from("manutencoes")
-    .list(manutencaoId, { limit: 100, sortBy: { column: "name", order: "desc" } });
+    .list(manutencaoId, {
+      limit: 100,
+      sortBy: { column: "name", order: "desc" },
+    });
 
   if (error) return [];
 
@@ -1723,8 +1494,13 @@ export async function listManutencaoAnexos(manutencaoId: string): Promise<Array<
   return items.filter((x) => !!x.url);
 }
 
-export async function getManutencaoAnexoUrl(key: string, seconds = 3600): Promise<string> {
-  const { data, error } = await supabase.storage.from("manutencoes").createSignedUrl(key, seconds);
+export async function getManutencaoAnexoUrl(
+  key: string,
+  seconds = 3600
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("manutencoes")
+    .createSignedUrl(key, seconds);
   if (error) throw error;
   return data.signedUrl;
 }
