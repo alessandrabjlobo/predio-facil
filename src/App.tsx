@@ -26,7 +26,8 @@ import Configuracoes from "@/pages/Configuracoes";
 import Preventivas from "@/pages/Preventivas";
 import Relatorios from "@/pages/Relatorios";
 import CondominioDetalhe from "@/pages/CondominioDetalhe";
-import AtivoDetalhe from "@/pages/AtivoDetalhe"; // crie esse arquivo se ainda não existir
+import AtivoDetalhe from "@/pages/AtivoDetalhe";
+import Manutencoes from "@/pages/Manutencoes"; // ✅ novo import
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,7 +64,7 @@ export default function App() {
               />
               <Route path="/auth/set-password" element={<SetPasswordPage />} />
 
-                        {/* Rotas protegidas */}
+              {/* Rotas protegidas */}
               <Route
                 path="/"
                 element={
@@ -75,13 +76,13 @@ export default function App() {
                 <Route index element={<TenantIndex />} />
 
                 {/* Admin Master (apenas owner) */}
-                <Route 
-                  path="admin" 
+                <Route
+                  path="admin"
                   element={
                     <RequireOwner>
                       <AdminMaster />
                     </RequireOwner>
-                  } 
+                  }
                 />
 
                 {/* Condomínio Detalhe */}
@@ -91,16 +92,26 @@ export default function App() {
                 <Route path="ativos/:id" element={<AtivoDetalhe />} />
 
                 {/* Síndico/Admin de condomínio */}
-                <Route 
-                  path="dashboard/sindico" 
+                <Route
+                  path="dashboard/sindico"
                   element={
                     <RequireRole allowed={["sindico", "admin"]}>
                       <Dashboard />
                     </RequireRole>
-                  } 
+                  }
                 />
 
-                {/* Módulos (protegidos por autenticação) */}
+                {/* ✅ Nova rota: Manutenções */}
+                <Route
+                  path="manutencoes"
+                  element={
+                    <RequireRole allowed={["sindico", "admin"]}>
+                      <Manutencoes />
+                    </RequireRole>
+                  }
+                />
+
+                {/* Módulos */}
                 <Route path="ativos" element={<Ativos />} />
                 <Route path="os" element={<OS />} />
                 <Route path="conformidade" element={<Conformidade />} />
@@ -108,7 +119,6 @@ export default function App() {
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
               </Route>
-
 
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
