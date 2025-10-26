@@ -1,367 +1,75 @@
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  ClipboardList,
-  Wrench,
-  Package,
-  ShieldCheck,
-  FileText,
-  AlertTriangle,
-  Clock,
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Building2, Users, Wrench, ClipboardList } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-import KpiCard from "@/components/dashboard/KpiCard";
-import MiniCalendar from "@/components/dashboard/MiniCalendar";
-import { CondominioSwitcher } from "@/components/CondominioSwitcher";
-import { useCondominioAtual } from "@/hooks/useCondominioAtual";
-
-import "@/styles/fullcalendar-theme.css";
-
-// (opcional) se você já tem essas funções no seu lib/api, os imports abaixo funcionam;
-// caso contrário, os fallbacks dentro do useEffect asseguram que a tela carregue mesmo assim.
-let api: any = {};
-try {
-  api = require("@/lib/api");
-} catch {
-  // segue com fallbacks
-}
-
-type OSItem = {
-  id: string;
-  titulo: string;
-  descricao?: string | null;
-  status?: "aberta" | "em andamento" | "concluida" | "cancelada";
-  previsao?: string | null;
-  ativo_nome?: string | null;
-  executor?: string | null;
-};
-
-type Manutencao = {
-  id: string;
-  titulo: string;
-  data: string; // ISO date
-  status?: "agendado" | "atrasado" | "executado" | "iminente";
-};
-
 export default function DashboardAdmin() {
-  const nav = useNavigate();
-  const { condominio } = useCondominioAtual();
-  const condoId = condominio?.id ?? null;
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: async () => {
+      const [condominios, usuarios, manutencoes, os] = await Promise.all([
+        supabase.from("condominios").select("id", { count: "exact", head: true }),
+        supabase.from("usuarios").select("id", { count: "exact", head: true }),
+        supabase.from("manutencoes").select("id", { count: "exact", head: true }),
+        supabase.from("os").select("id", { count: "exact", head: true }),
+      ]);
 
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    usuarios: 0,
-    sindicos: 0,
-    ativos: 0,
-    gastos: "R$ 0",
+      return {
+        totalCondominios: condominios.count || 0,
+        totalUsuarios: usuarios.count || 0,
+        totalManutencoes: manutencoes.count || 0,
+        totalOS: os.count || 0,
+      };
+    },
   });
 
-  const [osRecentes, setOsRecentes] = useState<OSItem[]>([]);
-  const [alertas, setAlertas] = useState<{ id: string; titulo: string; severidade: "alta" | "media" | "baixa" }[]>([]);
-  const [proximas, setProximas] = useState<Manutencao[]>([]);
-
-  const eventos = useMemo(
-    () =>
-      proximas.map((p) => ({
-        id: p.id,
-        title: p.titulo,
-        start: p.data,
-        extendedProps: { status: (p.status ?? "agendado") as const },
-      })),
-    [proximas]
-  );
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        // Se ainda não temos condomínio (ex.: acabou de logar), zera a tela
-        if (!condoId) {
-          setStats({ usuarios: 0, sindicos: 0, ativos: 0, gastos: "R$ 0" });
-          setOsRecentes([]);
-          setProximas([]);
-          setAlertas([]);
-          return;
-        }
-
-        // ---- KPIs por condomínio ----
-        const [usuariosRes, ativosRes, sindicosRes] = await Promise.all([
-          supabase
-            .from("usuarios_condominios")
-            .select("id", { count: "exact" })
-            .eq("condominio_id", condoId),
-          supabase
-            .from("ativos")
-            .select("id", { count: "exact" })
-            .eq("condominio_id", condoId),
-          supabase
-            .from("usuarios_condominios")
-            .select("id", { count: "exact" })
-            .eq("condominio_id", condoId)
-            .eq("papel", "sindico"),
-        ]);
-
-        setStats({
-          usuarios: usuariosRes?.count ?? 0,
-          sindicos: sindicosRes?.count ?? 0,
-          ativos: ativosRes?.count ?? 0,
-          // TODO: substituir por soma real de despesas do mês do condomínio
-          gastos: "R$ 85.450",
-        });
-
-        // ---- Listas por condomínio ----
-        // OS Recentes
-        if (api?.listOS) {
-          const todas: OSItem[] = await api.listOS({ condominio_id: condoId, limit: 6 });
-          setOsRecentes((todas || []).slice(0, 6));
-        } else {
-          // fallback
-          setOsRecentes([
-            { id: "OS-1023", titulo: "Troca de filtro bomba JN-02", status: "em andamento", previsao: new Date().toISOString(), ativo_nome: "Bomba JN-02" },
-            { id: "OS-1022", titulo: "Lubrificação exaustor G2", status: "aberta", previsao: null, ativo_nome: "Exaustor G2" },
-            { id: "OS-1021", titulo: "Inspeção quadro QGF", status: "concluida", previsao: new Date().toISOString(), ativo_nome: "QGF Principal" },
-          ]);
-        }
-
-        // Próximas manutenções / calendário
-        if (api?.listUpcomingManutencoes) {
-          const prox = await api.listUpcomingManutencoes(7, { condominio_id: condoId });
-          setProximas(
-            (prox || []).map((p: any) => ({
-              id: p.id,
-              titulo: p.titulo ?? "Manutenção",
-              data: p.data_prevista ?? p.start,
-              status: p.status ?? "agendado",
-            }))
-          );
-        } else {
-          const base = new Date();
-          setProximas([
-            { id: "M-1", titulo: "Revisão elevador bloco A", data: new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1, 9, 0).toISOString(), status: "agendado" },
-            { id: "M-2", titulo: "Teste gerador", data: new Date(base.getFullYear(), base.getMonth(), base.getDate() + 2, 14, 0).toISOString(), status: "iminente" },
-          ]);
-        }
-
-        // Alertas prioritários (ex.: atrasadas do condomínio)
-        if (api?.listAtrasadas) {
-          const atrasadas = await api.listAtrasadas({ condominio_id: condoId });
-          setAlertas(
-            (atrasadas || []).map((a: any) => ({
-              id: a.id,
-              titulo: a.titulo ?? "Manutenção atrasada",
-              severidade: "alta",
-            }))
-          );
-        } else {
-          setAlertas([{ id: "A-1", titulo: "Inspeção SPDA atrasada", severidade: "alta" }]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [condoId]);
+  const kpis = [
+    {
+      title: "Condomínios",
+      value: stats?.totalCondominios ?? 0,
+      icon: Building2,
+      color: "text-blue-600",
+    },
+    {
+      title: "Usuários",
+      value: stats?.totalUsuarios ?? 0,
+      icon: Users,
+      color: "text-green-600",
+    },
+    {
+      title: "Manutenções",
+      value: stats?.totalManutencoes ?? 0,
+      icon: Wrench,
+      color: "text-orange-600",
+    },
+    {
+      title: "Ordens de Serviço",
+      value: stats?.totalOS ?? 0,
+      icon: ClipboardList,
+      color: "text-purple-600",
+    },
+  ];
 
   return (
-    <div className="p-6 max-w-[1320px] mx-auto space-y-6">
-      {/* Título + Seletor + Ações rápidas */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h2 className="text-[22px] font-semibold tracking-tight">Visão Geral do Condomínio</h2>
-          <p className="text-muted-foreground text-sm">
-            {condominio?.nome ?? "Selecione um condomínio"}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Selecionador de condomínio visível aqui */}
-          <CondominioSwitcher />
-
-          <Button onClick={() => nav("/os")}>
-            <ClipboardList className="w-4 h-4 mr-2" />
-            Nova OS
-          </Button>
-          <Button variant="outline" onClick={() => nav("/ativos")}>
-            <Package className="w-4 h-4 mr-2" />
-            Novo Ativo
-          </Button>
-          <Button variant="outline" onClick={() => nav("/conformidade")}>
-            <ShieldCheck className="w-4 h-4 mr-2" />
-            Nova Conformidade
-          </Button>
-        </div>
+    <div className="p-6 space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Dashboard Admin Master</h1>
+        <p className="text-muted-foreground">Visão geral do sistema</p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard title="Usuários" value={loading ? "…" : stats.usuarios} hint="Total cadastrados" icon="users" />
-        <KpiCard title="Síndicos" value={loading ? "…" : stats.sindicos} hint="Administradores ativos" icon="shield" />
-        <KpiCard title="Ativos" value={loading ? "…" : stats.ativos} hint="Equipamentos cadastrados" icon="package" />
-        <KpiCard title="Gastos" value={stats.gastos} hint="Mês atual" icon="money" />
-      </div>
-
-      {/* Calendário + Lateral */}
-      <div className="grid grid-cols-12 gap-4">
-        {/* Calendário */}
-        <Card className="col-span-12 lg:col-span-8">
-          <CardHeader className="pb-2">
-            <CardTitle>Calendário (semana)</CardTitle>
-            <CardDescription>Manutenções agendadas</CardDescription>
-
-            {/* Chips de status */}
-            <div className="flex flex-wrap gap-2 pt-2">
-              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-100 text-blue-700">● Agendado</span>
-              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-yellow-100 text-yellow-800">● Iminente</span>
-              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-red-100 text-red-700">● Atrasado</span>
-              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-green-100 text-green-700">● Executado</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <MiniCalendar onOpenAgenda={(iso) => nav(`/agenda${iso ? `?date=${iso}` : ""}`)} view="listWeek" events={eventos} />
-          </CardContent>
-        </Card>
-
-        {/* Coluna lateral */}
-        <div className="col-span-12 lg:col-span-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-                Alertas Prioritários
-              </CardTitle>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {kpis.map((kpi) => (
+          <Card key={kpi.title}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{kpi.title}</CardTitle>
+              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
             </CardHeader>
             <CardContent>
-              {alertas.length === 0 ? (
-                <p className="text-gray-500 text-sm">Nenhum alerta crítico</p>
-              ) : (
-                <ul className="space-y-2">
-                  {alertas.map((a) => (
-                    <li key={a.id} className="text-sm">
-                      <span className="font-medium">{a.titulo}</span>
-                      <span className="ml-2 inline-flex items-center text-red-600">● {a.severidade}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="text-2xl font-bold">{kpi.value}</div>
             </CardContent>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-blue-600" />
-                Próximas Manutenções
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {proximas.length === 0 ? (
-                <p className="text-gray-500 text-sm">Nenhuma manutenção próxima</p>
-              ) : (
-                <ul className="space-y-2">
-                  {proximas.map((p) => (
-                    <li key={p.id} className="text-sm">
-                      <span className="font-medium">{p.titulo}</span>
-                      <span className="ml-2 text-gray-500">
-                        {new Date(p.data).toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* OS recentes + Acesso rápido */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>Ordens de Serviço Recentes</CardTitle>
-            <CardDescription>Últimas movimentações</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {osRecentes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma OS recente.</p>
-            ) : (
-              <div className="overflow-auto rounded border">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-2 text-left">OS</th>
-                      <th className="px-4 py-2 text-left">Status</th>
-                      <th className="px-4 py-2 text-left">Ativo</th>
-                      <th className="px-4 py-2 text-left">Executor</th>
-                      <th className="px-4 py-2 text-left">Prevista</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {osRecentes.map((r) => (
-                      <tr key={r.id} className="border-t">
-                        <td className="px-4 py-2">
-                          <div className="font-medium">{r.titulo}</div>
-                          <div className="text-xs text-gray-500">{r.id}</div>
-                        </td>
-                        <td className="px-4 py-2">
-                          <StatusBadge status={r.status ?? "aberta"} />
-                        </td>
-                        <td className="px-4 py-2">{r.ativo_nome ?? "-"}</td>
-                        <td className="px-4 py-2">{r.executor ?? "-"}</td>
-                        <td className="px-4 py-2">
-                          {r.previsao ? new Date(r.previsao).toLocaleString() : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Acesso Rápido</CardTitle>
-            <CardDescription>Relatórios e páginas-chave</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button className="w-full justify-start" onClick={() => nav("/relatorios")} variant="outline">
-              <FileText className="w-4 h-4 mr-2" />
-              Relatório de Manutenções
-            </Button>
-            <Button className="w-full justify-start" onClick={() => nav("/relatorios")} variant="outline">
-              <FileText className="w-4 h-4 mr-2" />
-              Relatório Financeiro
-            </Button>
-            <Button className="w-full justify-start" onClick={() => nav("/conformidade")} variant="outline">
-              <ShieldCheck className="w-4 h-4 mr-2" />
-              Status de Conformidade
-            </Button>
-            <Button className="w-full justify-start" onClick={() => nav("/os")} variant="outline">
-              <ClipboardList className="w-4 h-4 mr-2" />
-              Gerenciar OS
-            </Button>
-            <Button className="w-full justify-start" onClick={() => nav("/ativos")} variant="outline">
-              <Wrench className="w-4 h-4 mr-2" />
-              Gestão de Ativos
-            </Button>
-          </CardContent>
-        </Card>
+        ))}
       </div>
     </div>
   );
-}
-
-/** Badge de status igual ao usado nas telas de OS */
-function StatusBadge({ status }: { status: "aberta" | "em andamento" | "concluida" | "cancelada" }) {
-  const map: Record<string, string> = {
-    aberta: "bg-gray-100 text-gray-700",
-    "em andamento": "bg-yellow-100 text-yellow-800",
-    concluida: "bg-green-100 text-green-700",
-    cancelada: "bg-red-100 text-red-700",
-  };
-  return <span className={`px-2 py-1 rounded text-xs font-medium ${map[status]}`}>{status}</span>;
 }
