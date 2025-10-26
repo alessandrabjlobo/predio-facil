@@ -23,9 +23,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select"; // se não tiver, substitua por <select> nativo
 
 function Empty({ text }: { text: string }) {
   return (
@@ -143,22 +143,13 @@ export default function AdminMaster() {
       cnpj: condoForm.cnpj?.trim() || null,
       cidade: condoForm.cidade?.trim() || null,
       uf: condoForm.uf?.trim() || null,
+      sindico_id: condoForm.sindico_id || null,
     };
 
     const created: any = await createCondominio.mutateAsync(payload);
 
-    // vincula síndico, se escolhido
-    if (condoForm.sindico_id) {
-      try {
-        await assignSindico.mutateAsync({
-          usuario_id: condoForm.sindico_id,
-          condominio_id: created.id,
-          is_principal: true,
-        });
-      } catch {
-        // só loga; o cadastro do condomínio já foi feito
-      }
-    }
+    // se não quisermos que o hook faça a vinculação, poderíamos chamar assignSindico aqui.
+    // como o hook já lida com sindico_id (ver arquivo do hook abaixo), não precisa.
 
     setOpenNewCondo(false);
     resetCondoForm();
@@ -170,12 +161,14 @@ export default function AdminMaster() {
 
     await updateCondominio.mutateAsync({
       id: openEditCondo.id,
-      nome: openEditCondo.nome.trim(),
-      endereco: openEditCondo.endereco?.trim() || null,
-      unidades: openEditCondo.unidades ? Number(openEditCondo.unidades) : null,
-      cnpj: openEditCondo.cnpj?.trim() || null,
-      cidade: openEditCondo.cidade?.trim() || null,
-      uf: openEditCondo.uf?.trim() || null,
+      patch: {
+        nome: openEditCondo.nome.trim(),
+        endereco: openEditCondo.endereco?.trim() || null,
+        unidades: openEditCondo.unidades ? Number(openEditCondo.unidades) : null,
+        cnpj: openEditCondo.cnpj?.trim() || null,
+        cidade: openEditCondo.cidade?.trim() || null,
+        uf: openEditCondo.uf?.trim() || null,
+      },
     });
 
     setOpenEditCondo(null);
@@ -186,7 +179,7 @@ export default function AdminMaster() {
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
         title="Painel Administrativo"
-        subtitle="Gerencie condomínios, síndicos, usuários e templates de manutenção"
+        subtitle="Visão de negócio: condomínios, usuários e engajamento"
         actions={
           <>
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -427,11 +420,11 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Novo Condomínio</DialogTitle>
+            <DialogDescription className="sr-only">
+              Preencha os dados abaixo para criar um novo condomínio.
+            </DialogDescription>
           </DialogHeader>
-          <form
-            className="grid gap-3"
-            onSubmit={handleCreateCondo}
-          >
+          <form className="grid gap-3" onSubmit={handleCreateCondo}>
             <div>
               <Label>Nome *</Label>
               <Input
@@ -499,7 +492,6 @@ export default function AdminMaster() {
 
             <div>
               <Label>Síndico (já cadastrado)</Label>
-              {/* Se não usa um Select pronto, troque por <select> nativo */}
               <select
                 className="border rounded px-3 py-2 w-full"
                 value={condoForm.sindico_id}
@@ -540,6 +532,9 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Condomínio</DialogTitle>
+            <DialogDescription className="sr-only">
+              Edite os dados e salve para atualizar o condomínio.
+            </DialogDescription>
           </DialogHeader>
 
           {openEditCondo && (
@@ -627,6 +622,9 @@ export default function AdminMaster() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription className="sr-only">
+              Atualize os dados do usuário.
+            </DialogDescription>
           </DialogHeader>
 
           {openEditUser && (
@@ -636,8 +634,10 @@ export default function AdminMaster() {
                 e.preventDefault();
                 await updateUsuario.mutateAsync({
                   id: openEditUser.id,
-                  nome: openEditUser.nome || null,
-                  papel: openEditUser.papel || null,
+                  patch: {
+                    nome: openEditUser.nome || null,
+                    papel: openEditUser.papel || null,
+                  },
                 });
                 setOpenEditUser(null);
               }}
