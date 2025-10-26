@@ -25,6 +25,8 @@ import Conformidade from "@/pages/Conformidade";
 import Configuracoes from "@/pages/Configuracoes";
 import Preventivas from "@/pages/Preventivas";
 import Relatorios from "@/pages/Relatorios";
+import CondominioDetalhe from "@/pages/CondominioDetalhe";
+import AtivoDetalhe from "@/pages/AtivoDetalhe"; // crie esse arquivo se ainda não existir
 
 const queryClient = new QueryClient({
   defaultOptions: {
