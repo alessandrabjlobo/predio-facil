@@ -1,30 +1,24 @@
-// src/pages/Configuracoes.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  // Tipos de ativo
   listAtivoTipos,
   createAtivoTipo,
   updateAtivoTipo,
   deleteAtivoTipo,
-  // Locais
   listLocais,
   createLocal,
   updateLocal,
   deleteLocal,
-  // Condo config
   getCondoConfig,
   upsertCondoConfig,
-  // Templates de manutenção
   listManutTemplates,
   upsertManutTemplate,
   deleteManutTemplate,
-  // Tipagens
   AtivoTipoRow,
   LocalRow,
   CondoConfig,
   ManutTemplate,
 } from "@/lib/api";
-import { supabase } from "@/integrations/supabase/client"; // ⬅️ para CRUD de conf_categorias
+import { supabase } from "@/integrations/supabase/client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,12 +26,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Settings } from "lucide-react";
+import { Page } from "@/components/layout/CheckPage";
 
 // --- helpers locais ---
 type ConfCategoria = {
   id: string;
-  slug: string; // chave a ser usada em conf_tipo
-  nome: string; // label amigável (ex.: SPDA, Incêndio…)
+  slug: string;
+  nome: string;
   created_at?: string | null;
 };
 
@@ -66,11 +62,12 @@ export default function ConfiguracoesPage() {
   const [tab, setTab] = useState<"tipos" | "templates" | "categorias" | "locais" | "condo">("tipos");
 
   return (
-    <div className="p-6 grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">Configurações</h1>
-        <p className="text-gray-600">Ajuste padrões do sistema e cadastre referências para facilitar o dia a dia.</p>
-      </div>
+    <Page>
+      <Page.Header
+        icon={Settings}
+        title="Configurações"
+        subtitle="Ajuste padrões do sistema e cadastre referências para facilitar o dia a dia."
+      />
 
       <Tabs value={tab} onValueChange={(v: any) => setTab(v)}>
         <TabsList>
@@ -101,17 +98,16 @@ export default function ConfiguracoesPage() {
           <CondominioTab />
         </TabsContent>
       </Tabs>
-    </div>
+    </Page>
   );
 }
 
 /* ==================== Categorias (conformidade) ==================== */
-/** CRUD simples em public.conf_categorias com fallback aos valores distintos de ativo_tipos.conf_tipo */
 function CategoriasTab() {
   const [rows, setRows] = useState<ConfCategoria[]>([]);
   const [novoNome, setNovoNome] = useState("");
   const [loading, setLoading] = useState(true);
-  const [tabelaExiste, setTabelaExiste] = useState(true); // assume que existe; cai no fallback se der erro
+  const [tabelaExiste, setTabelaExiste] = useState(true);
 
   async function listFromTable(): Promise<ConfCategoria[]> {
     const { data, error } = await supabase
@@ -131,7 +127,7 @@ function CategoriasTab() {
     return Array.from(set)
       .sort((a, b) => a.localeCompare(b, "pt-BR"))
       .map((slug) => ({
-        id: slug, // pseudo-ID para render; não é editável/excluível no fallback
+        id: slug,
         slug,
         nome: slug.toUpperCase(),
       }));
@@ -144,7 +140,6 @@ function CategoriasTab() {
       setRows(data);
       setTabelaExiste(true);
     } catch {
-      // tabela não existe / sem permissão → fallback
       const fb = await listFallbackFromAtivoTipos();
       setRows(fb);
       setTabelaExiste(false);
@@ -278,13 +273,11 @@ function CategoriasTab() {
 }
 
 /* ==================== Tipos de Ativo ==================== */
-
 function TiposDeAtivoTab() {
   const [rows, setRows] = useState<AtivoTipoRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // combobox de categorias válidas: tenta conf_categorias, cai no fallback
-  const [categorias, setCategorias] = useState<string[]>([]); // lista de slugs
+  const [categorias, setCategorias] = useState<string[]>([]);
   async function carregarCategorias() {
     try {
       const { data, error } = await supabase
@@ -294,7 +287,6 @@ function TiposDeAtivoTab() {
       if (error) throw error;
       setCategorias((data ?? []).map((c: any) => c.slug));
     } catch {
-      // fallback: distintos de ativo_tipos.conf_tipo
       const tipos = await listAtivoTipos();
       const set = new Set<string>();
       for (const t of tipos) if (t.conf_tipo) set.add(t.conf_tipo);
@@ -335,7 +327,6 @@ function TiposDeAtivoTab() {
         nome: form.nome,
         is_conformidade: form.is_conformidade,
         conf_tipo: form.conf_tipo?.trim() ? (form.conf_tipo as any) : null,
-        // periodicidade_default: REMOVIDO
       });
       setForm({ nome: "", is_conformidade: false, conf_tipo: "" });
       await refresh();
@@ -351,7 +342,6 @@ function TiposDeAtivoTab() {
         nome: row.nome,
         is_conformidade: row.is_conformidade,
         conf_tipo: row.conf_tipo,
-        // periodicidade_default: REMOVIDO
       });
       await refresh();
       alert("Tipo de ativo salvo!");
@@ -362,7 +352,6 @@ function TiposDeAtivoTab() {
 
   return (
     <div className="grid gap-4">
-      {/* datalist compartilhado para conf_tipo */}
       <datalist id="conf-categorias">
         {categorias.map((slug) => (
           <option key={slug} value={slug} />
@@ -492,14 +481,12 @@ function TiposDeAtivoTab() {
   );
 }
 
-/* ==================== Templates (manut_templates) ==================== */
-
+/* ==================== Templates ==================== */
 function TemplatesTab() {
   const [filtro, setFiltro] = useState("");
   const [rows, setRows] = useState<ManutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Tipos de ativo para combobox pesquisável
   const [tipos, setTipos] = useState<AtivoTipoRow[]>([]);
   useEffect(() => {
     (async () => {
@@ -595,7 +582,6 @@ function TemplatesTab() {
 
   return (
     <div className="grid gap-4">
-      {/* DATALIST para inputs com busca */}
       <datalist id="tipos-ativos-datalist">
         {opcoesTipos.map((n) => (
           <option key={n} value={n} />
@@ -785,7 +771,6 @@ function TemplatesTab() {
 }
 
 /* ==================== Locais ==================== */
-
 function LocaisTab() {
   const [rows, setRows] = useState<LocalRow[]>([]);
   const [novo, setNovo] = useState("");
@@ -875,7 +860,6 @@ function LocaisTab() {
 }
 
 /* ==================== Dados do Condomínio ==================== */
-
 function CondominioTab() {
   const [cfg, setCfg] = useState<CondoConfig | null>(null);
   const [form, setForm] = useState<{ nome: string; unidades: string; endereco: string }>({
