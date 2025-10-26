@@ -76,6 +76,7 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="categorias">Categorias (conformidade)</TabsTrigger>
           <TabsTrigger value="locais">Locais</TabsTrigger>
           <TabsTrigger value="condo">Dados do condomínio</TabsTrigger>
+          <TabsTrigger value="nbr">Base NBR 5674</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tipos" className="mt-4">
