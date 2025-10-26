@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-type UserRole = "owner" | "sindico" | "admin" | "funcionario" | "zelador" | "fornecedor" | "morador" | "conselho" | null;
+export type UserRole = "owner" | "sindico" | "admin" | "funcionario" | "zelador" | "fornecedor" | "morador" | "conselho" | null;
 
 export function useUserRole() {
   const [role, setRole] = useState<UserRole>(null);
@@ -93,3 +93,6 @@ export function useUserRole() {
 
   return { role, loading, condominioId };
 }
+
+// Re-exportar o tipo para uso em outros arquivos
+export { type UserRole };
