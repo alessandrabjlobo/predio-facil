@@ -1,66 +1,70 @@
-import { Menu, Search, Bell } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CondominioSwitcher } from "@/components/CondominioSwitcher";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-interface HeaderProps {
-  onToggleCollapse: () => void;
-}
-
-export default function Header({ onToggleCollapse }: HeaderProps) {
-  const [userName, setUserName] = useState<string>("");
+/**
+ * Propriedades esperadas pelo Layout
+ */
+export default function Header({
+  onToggleCollapse,
+}: {
+  onToggleCollapse?: () => void;
+}) {
+  // (opcional) se quiser esconder o switcher para o dono do produto (owner),
+  // detecta o papel principal aqui. Caso não precise, pode remover este bloco.
+  const [papel, setPapel] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      const user = data.user;
-      const name = user?.user_metadata?.nome || user?.user_metadata?.name || user?.email?.split("@")[0] || "U";
-      setUserName(name);
-    });
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: usuario } = await supabase
+          .from("usuarios")
+          .select("id")
+          .eq("auth_user_id", user.id)
+          .maybeSingle();
+
+        if (!usuario) return;
+
+        const { data: relacao } = await supabase
+          .from("usuarios_condominios")
+          .select("papel")
+          .eq("usuario_id", usuario.id)
+          .eq("is_principal", true)
+          .maybeSingle();
+
+        setPapel(relacao?.papel ?? null);
+      } catch {
+        // silencioso
+      }
+    })();
   }, []);
 
-  const initials = userName
-    .split(" ")
-    .map(n => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
   return (
-    <header className="h-16 bg-white border-b border-border flex items-center justify-between px-6 sticky top-0 z-40">
-      <div className="flex items-center gap-4">
+    <header className="h-14 border-b bg-white px-3 flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
-          size="icon"
+          className="h-9 w-9 p-0"
           onClick={onToggleCollapse}
-          aria-label="Toggle sidebar"
+          aria-label="Alternar sidebar"
         >
           <Menu className="h-5 w-5" />
         </Button>
-        
-        <div className="relative w-80 hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="pl-9"
-          />
-        </div>
+
+        {/* Seletor global: aparece quando o usuário tem 2+ condomínios.
+           O próprio CondominioSwitcher já retorna null quando não houver lista
+           ou só houver 1 condomínio. */}
+        {/* Se quiser esconder do owner, descomente a checagem: papel !== 'owner' && */}
+        <CondominioSwitcher />
       </div>
 
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 h-4 w-4 bg-danger text-[10px] text-white rounded-full flex items-center justify-center">
-            3
-          </span>
-        </Button>
-
-        <Avatar className="h-9 w-9 cursor-pointer">
-          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+      <div className="flex items-center gap-2">
+        {/* coloque aqui seus itens do lado direito (perfil, tema, etc.) */}
       </div>
     </header>
   );
