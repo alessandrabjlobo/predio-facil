@@ -16,7 +16,7 @@ import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 import Login from "@/pages/Login";
 import SignUp from "@/pages/SignUp";
 import SetPasswordPage from "@/pages/SetPassword";
-import TenantIndex from "@/pages/TenantIndex";
+import TenantIndex from "@/pages/TenantIndex"; // pode remover se não usar
 import AdminMaster from "@/pages/AdminMaster";
 import Dashboard from "@/pages/Dashboard";
 import Ativos from "@/pages/Ativos";
@@ -27,14 +27,13 @@ import Preventivas from "@/pages/Preventivas";
 import Relatorios from "@/pages/Relatorios";
 import CondominioDetalhe from "@/pages/CondominioDetalhe";
 import AtivoDetalhe from "@/pages/AtivoDetalhe";
-import Manutencoes from "@/pages/Manutencoes"; // ✅ novo import
+import HomeRedirect from "@/pages/HomeRedirect";
+// (opcional) página de manutenções do síndico
+// import Manutencoes from "@/pages/Manutencoes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
+    queries: { retry: 1, refetchOnWindowFocus: false },
   },
 });
 
@@ -45,7 +44,7 @@ export default function App() {
         <ErrorBoundary>
           <Suspense fallback={<div className="p-8 text-center">Carregando...</div>}>
             <Routes>
-              {/* Rotas públicas */}
+              {/* Públicas */}
               <Route
                 path="/login"
                 element={
@@ -64,7 +63,7 @@ export default function App() {
               />
               <Route path="/auth/set-password" element={<SetPasswordPage />} />
 
-              {/* Rotas protegidas */}
+              {/* Protegidas */}
               <Route
                 path="/"
                 element={
@@ -73,9 +72,10 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<TenantIndex />} />
+                {/* 🔁 Decisor de dashboard por papel */}
+                <Route index element={<HomeRedirect />} />
 
-                {/* Admin Master (apenas owner) */}
+                {/* Admin Master (dono do sistema) */}
                 <Route
                   path="admin"
                   element={
@@ -85,13 +85,7 @@ export default function App() {
                   }
                 />
 
-                {/* Condomínio Detalhe */}
-                <Route path="condominios/:id" element={<CondominioDetalhe />} />
-
-                {/* Ativo Detalhe */}
-                <Route path="ativos/:id" element={<AtivoDetalhe />} />
-
-                {/* Síndico/Admin de condomínio */}
+                {/* Dashboard do síndico */}
                 <Route
                   path="dashboard/sindico"
                   element={
@@ -101,23 +95,25 @@ export default function App() {
                   }
                 />
 
-                {/* ✅ Nova rota: Manutenções */}
-                <Route
-                  path="manutencoes"
-                  element={
-                    <RequireRole allowed={["sindico", "admin"]}>
-                      <Manutencoes />
-                    </RequireRole>
-                  }
-                />
-
-                {/* Módulos */}
+                {/* Demais módulos */}
+                <Route path="condominios/:id" element={<CondominioDetalhe />} />
+                <Route path="ativos/:id" element={<AtivoDetalhe />} />
                 <Route path="ativos" element={<Ativos />} />
                 <Route path="os" element={<OS />} />
                 <Route path="conformidade" element={<Conformidade />} />
                 <Route path="preventivas" element={<Preventivas />} />
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
+
+                {/* (opcional) Manutenções na visão do síndico */}
+                {/* <Route
+                  path="manutencoes"
+                  element={
+                    <RequireRole allowed={["sindico", "admin"]}>
+                      <Manutencoes />
+                    </RequireRole>
+                  }
+                /> */}
               </Route>
 
               <Route path="*" element={<Navigate to="/login" replace />} />
