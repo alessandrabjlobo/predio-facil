@@ -20,14 +20,21 @@ const Navigation = ({ activeTab, onTabChange }: NavigationProps) => {
   const isOnIndexPage = location.pathname === "/";
 
   const tabs = [
-    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "maintenance", label: "Manutenções", icon: Wrench },
-    { id: "assets", label: "Ativos", icon: Building2 },
-    { id: "planos", label: "Planos", icon: Calendar },
-    { id: "os", label: "OS", icon: ClipboardCheck },
-    { id: "compliance", label: "Conformidades", icon: ClipboardCheck },
-    { id: "settings", label: "Configurações", icon: Settings, route: "/settings" },
+    { id: "dashboard", label: "Dashboard", icon: Home, route: "/dashboard/sindico" },
+    { id: "agenda", label: "Agenda", icon: Calendar, route: "/agenda" },
+    { id: "chamados", label: "Chamados", icon: MessageSquare, route: "/chamados" },
+    { id: "os", label: "Ordens de Serviço", icon: ClipboardList, route: "/os" },
+    { id: "preventivas", label: "Preventivas", icon: Clock, route: "/preventivas" },
+    { id: "programacao", label: "Programação", icon: Calendar, route: "/programacao" },
+    { id: "ativos", label: "Ativos", icon: Package, route: "/ativos" },
+    { id: "fornecedores", label: "Fornecedores", icon: Users, route: "/fornecedores" },
+    { id: "marketplace", label: "Marketplace", icon: ShoppingBag, route: "/marketplace" },
+    { id: "relatorios", label: "Relatórios", icon: FileText, route: "/relatorios" },
+    { id: "conformidade", label: "Conformidade", icon: Shield, route: "/conformidade" },
+    { id: "configuracoes", label: "Configurações", icon: Settings, route: "/configuracoes" },
+    ...(role === 'admin' ? [{ id: "admin", label: "Admin", icon: Users, route: "/dashboard/admin" }] : []),
   ];
+
 
   const handleLogout = async () => {
     await signOut();
