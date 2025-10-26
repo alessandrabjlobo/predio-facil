@@ -1,6 +1,7 @@
 // src/components/Sidebar.tsx
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { useUserRole, type UserRole } from "@/hooks/useUserRole";
 import {
   Building2,
   LayoutDashboard,
