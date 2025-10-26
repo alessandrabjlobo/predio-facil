@@ -1,4 +1,3 @@
-// FILE: src/pages/AdminMaster.tsx
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
 import { KPICards } from "@/components/patterns/KPICards";
@@ -55,16 +54,18 @@ export default function AdminMaster() {
     createCondominio,
     updateCondominio,
     deleteCondominio,
-    // assignSindico,  // ❌ não precisa mais — create já aceita sindico_id
+    assignSindico,
   } = useCondominios();
 
   const {
     usuarios,
     isLoading: usuariosLoading,
+    createUsuario,
     updateUsuario,
     deleteUsuario,
   } = useUsuarios();
 
+  // KPIs de negócio (sem dados operacionais do dia a dia)
   const totalCondominios = condominios?.length || 0;
   const totalUsuarios = usuarios?.length || 0;
   const totalSindicos = (usuarios || []).filter(
@@ -72,12 +73,12 @@ export default function AdminMaster() {
   ).length;
 
   const kpis = [
-    { label: "Total de Condomínios", value: totalCondominios, icon: Building2 },
-    { label: "Total de Usuários", value: totalUsuarios, icon: Users },
-    { label: "Síndicos Ativos", value: totalSindicos, icon: UserPlus },
-    { label: "Conformidades Críticas", value: 0, icon: Settings },
+    { label: "Condomínios", value: totalCondominios, icon: Building2 },
+    { label: "Usuários", value: totalUsuarios, icon: Users },
+    { label: "Síndicos", value: totalSindicos, icon: UserPlus },
   ];
 
+  // Filtros
   const [qConds, setQConds] = useState("");
   const [qUsers, setQUsers] = useState("");
 
@@ -103,9 +104,11 @@ export default function AdminMaster() {
     });
   }, [usuarios, qUsers]);
 
+  // Modais
   const [openNewCondo, setOpenNewCondo] = useState(false);
   const [openEditCondo, setOpenEditCondo] = useState<CondoForm | null>(null);
   const [openEditUser, setOpenEditUser] = useState<any | null>(null);
+  const [openNewUser, setOpenNewUser] = useState(false);
 
   const [condoForm, setCondoForm] = useState<CondoForm>({
     nome: "",
@@ -115,6 +118,12 @@ export default function AdminMaster() {
     cidade: "",
     uf: "",
     sindico_id: "",
+  });
+
+  const [userForm, setUserForm] = useState<{ nome: string; email: string; papel: string }>({
+    nome: "",
+    email: "",
+    papel: "sindico",
   });
 
   function resetCondoForm() {
@@ -129,11 +138,14 @@ export default function AdminMaster() {
     });
   }
 
+  function resetUserForm() {
+    setUserForm({ nome: "", email: "", papel: "sindico" });
+  }
+
   async function handleCreateCondo(e: React.FormEvent) {
     e.preventDefault();
     if (!condoForm.nome.trim()) return;
 
-    // ✅ passa sindico_id direto pro hook createCondominio
     const payload = {
       nome: condoForm.nome.trim(),
       endereco: condoForm.endereco?.trim() || null,
@@ -141,10 +153,19 @@ export default function AdminMaster() {
       cnpj: condoForm.cnpj?.trim() || null,
       cidade: condoForm.cidade?.trim() || null,
       uf: condoForm.uf?.trim() || null,
-      sindico_id: condoForm.sindico_id || null,
     };
 
-    await createCondominio.mutateAsync(payload);
+    const created: any = await createCondominio.mutateAsync(payload);
+
+    if (condoForm.sindico_id) {
+      try {
+        await assignSindico.mutateAsync({
+          usuario_id: condoForm.sindico_id,
+          condominio_id: created.id,
+          is_principal: true,
+        });
+      } catch {}
+    }
 
     setOpenNewCondo(false);
     resetCondoForm();
@@ -156,26 +177,34 @@ export default function AdminMaster() {
 
     await updateCondominio.mutateAsync({
       id: openEditCondo.id,
-      // OBS: se o tipo do hook ainda não inclui cidade/uf, adicione lá.
-      // Temporariamente, você pode usar `as any` no patch.
       patch: {
         nome: openEditCondo.nome.trim(),
         endereco: openEditCondo.endereco?.trim() || null,
         unidades: openEditCondo.unidades ? Number(openEditCondo.unidades) : null,
         cnpj: openEditCondo.cnpj?.trim() || null,
-        cidade: openEditCondo.cidade?.trim() || null,
-        uf: openEditCondo.uf?.trim() || null,
-      } as any,
+      },
     });
 
     setOpenEditCondo(null);
+  }
+
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!userForm.email.trim()) return;
+    await createUsuario.mutateAsync({
+      nome: userForm.nome || null,
+      email: userForm.email.trim(),
+      papel: userForm.papel || "sindico",
+    });
+    setOpenNewUser(false);
+    resetUserForm();
   }
 
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
         title="Painel Administrativo"
-        subtitle="Gerencie condomínios, síndicos, usuários e templates de manutenção"
+        subtitle="Visão executiva do produto. Cadastre condomínios e usuários; configuração detalhada fica na página de Configurações."
         actions={
           <>
             <Button variant="outline" onClick={() => window.location.reload()}>
@@ -190,6 +219,7 @@ export default function AdminMaster() {
         }
       />
 
+      {/* KPIs focados no negócio */}
       <KPICards data={kpis} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -319,15 +349,21 @@ export default function AdminMaster() {
 
         {/* USUÁRIOS */}
         <TabsContent value="usuarios" className="mt-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Input
-              placeholder="Buscar usuário (nome/e-mail/papel)…"
-              value={qUsers}
-              onChange={(e) => setQUsers(e.target.value)}
-              className="max-w-sm"
-            />
-            <Button variant="outline" onClick={() => setQUsers("")}>
-              Limpar
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Buscar usuário (nome/e-mail/papel)…"
+                value={qUsers}
+                onChange={(e) => setQUsers(e.target.value)}
+                className="max-w-sm"
+              />
+              <Button variant="outline" onClick={() => setQUsers("")}>
+                Limpar
+              </Button>
+            </div>
+            <Button onClick={() => setOpenNewUser(true)}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Novo Usuário
             </Button>
           </div>
 
@@ -604,12 +640,69 @@ export default function AdminMaster() {
                 <Button type="button" variant="outline" onClick={() => setOpenEditCondo(null)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={updateCondominio.isPending}>
-                  Salvar
-                </Button>
+                <Button type="submit">Salvar</Button>
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: Novo Usuário */}
+      <Dialog open={openNewUser} onOpenChange={setOpenNewUser}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Cria apenas o perfil na tabela <code>usuarios</code>. (A criação/convite de autenticação é feita depois.)
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-3" onSubmit={handleCreateUser}>
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={userForm.nome}
+                onChange={(e) => setUserForm((s) => ({ ...s, nome: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                required
+                value={userForm.email}
+                onChange={(e) => setUserForm((s) => ({ ...s, email: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>Papel</Label>
+              <select
+                className="border rounded px-3 py-2 w-full capitalize"
+                value={userForm.papel}
+                onChange={(e) => setUserForm((s) => ({ ...s, papel: e.target.value }))}
+              >
+                <option value="sindico">sindico</option>
+                <option value="admin">admin</option>
+                <option value="owner">owner</option>
+                <option value="morador">morador</option>
+              </select>
+            </div>
+
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setOpenNewUser(false);
+                  resetUserForm();
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createUsuario.isPending}>
+                Criar
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
@@ -619,7 +712,7 @@ export default function AdminMaster() {
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
             <DialogDescription>
-              Atualize o nome e papel do usuário no sistema.
+              Atualize o nome, papel e (se desejar) o e-mail do usuário.
             </DialogDescription>
           </DialogHeader>
 
@@ -650,6 +743,17 @@ export default function AdminMaster() {
               </div>
 
               <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={openEditUser.email ?? ""}
+                  onChange={(e) =>
+                    setOpenEditUser((s: any) => ({ ...s, email: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div>
                 <Label>Papel</Label>
                 <select
                   className="border rounded px-3 py-2 w-full capitalize"
@@ -670,9 +774,7 @@ export default function AdminMaster() {
                 <Button type="button" variant="outline" onClick={() => setOpenEditUser(null)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={updateUsuario.isPending}>
-                  Salvar
-                </Button>
+                <Button type="submit">Salvar</Button>
               </DialogFooter>
             </form>
           )}
