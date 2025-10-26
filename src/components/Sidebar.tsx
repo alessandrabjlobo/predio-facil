@@ -4,7 +4,6 @@ import { useUserRole } from "@/hooks/useUserRole";
 import {
   Building2,
   LayoutDashboard,
-  Wrench,
   Users,
   Package,
   Settings,
@@ -13,12 +12,14 @@ import {
   ClipboardList,
   FileText,
   ChevronDown,
+  Calendar,
   type LucideIcon,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
 import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
+import { Button } from "@/components/ui/button";
 
 type NavItem = { name: string; href: string; icon: LucideIcon };
 type NavGroup = { label: string; items: NavItem[] };
@@ -28,7 +29,6 @@ interface SidebarProps {
 }
 
 const uniqueById = <T extends { condominio_id?: any; id?: any }>(arr: T[]) => {
-  // tenta condominio_id; se não houver, usa id
   return Array.from(
     new Map(arr.map((x, i) => [String(x.condominio_id ?? x.id ?? i), x])).values()
   );
@@ -39,7 +39,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const { role } = useUserRole();
   const [userName, setUserName] = useState<string>("Usuário");
 
-  // condos do usuário
   const { rows, loading } = useCondominiosDoUsuario();
   const rowsDedupe = useMemo(() => uniqueById(rows || []), [rows]);
   const ids = useMemo(
@@ -48,87 +47,73 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   );
 
   const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
-  const currentCondoName =
-    rowsDedupe.find((r) => String(r.condominio_id) === String(current))?.condominios?.nome ||
-    "Selecione";
 
-  // grupos de navegação por papel
   const navigationGroups: NavGroup[] = useMemo(() => {
-    if (role === "owner") {
+    if (role === "owner" || role === "admin") {
       return [
         {
-          label: "Dashboard",
-          items: [{ name: "Painel do Dono", href: "/owner", icon: LayoutDashboard }],
+          label: "Painel",
+          items: [{ name: "Dashboard", href: "/admin", icon: LayoutDashboard }],
+        },
+        {
+          label: "Gestão",
+          items: [
+            { name: "Condomínios", href: "/admin?tab=condominios", icon: Building2 },
+            { name: "Usuários", href: "/admin?tab=usuarios", icon: Users },
+          ],
         },
         {
           label: "Operacional",
           items: [
+            { name: "Ativos", href: "/ativos", icon: Package },
+            { name: "Planos", href: "/preventivas", icon: ClipboardList },
             { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
-            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
-            { name: "Planos de Manutenção", href: "/preventivas", icon: ClipboardList },
-            { name: "Usuários", href: "/owner/usuarios", icon: Users },
+            { name: "Conformidade", href: "/conformidade", icon: ShieldCheck },
           ],
         },
-        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
         {
-          label: "Configurações",
+          label: "Sistema",
           items: [
             { name: "Relatórios", href: "/relatorios", icon: FileText },
-            { name: "Condomínios", href: "/owner/condominios", icon: Building2 },
-            { name: "Configurações", href: "/configuracoes", icon: Settings },
+            { name: "Configurações", href: "/config", icon: Settings },
           ],
         },
-      ];
-    }
-
-    if (role === "admin") {
-      return [
-        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
-        {
-          label: "Operacional",
-          items: [
-            { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
-            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
-            { name: "Planos de Manutenção", href: "/preventivas", icon: ClipboardList },
-            { name: "Usuários", href: "/usuarios", icon: Users },
-            { name: "Relatórios", href: "/relatorios", icon: FileText },
-          ],
-        },
-        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
-        { label: "Configurações", items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }] },
       ];
     }
 
     if (role === "sindico") {
       return [
-        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
+        {
+          label: "Painel",
+          items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }],
+        },
         {
           label: "Operacional",
           items: [
             { name: "Ordens de Serviço", href: "/os", icon: ClipboardList },
-            { name: "Conformidades", href: "/conformidade", icon: ShieldCheck },
-            { name: "Chamados", href: "/chamados", icon: Wrench },
+            { name: "Conformidade", href: "/conformidade", icon: ShieldCheck },
+            { name: "Agenda", href: "/agenda", icon: Calendar },
+          ],
+        },
+        {
+          label: "Gestão",
+          items: [
+            { name: "Ativos", href: "/ativos", icon: Package },
             { name: "Relatórios", href: "/relatorios", icon: FileText },
           ],
         },
-        { label: "Ativos", items: [{ name: "Gestão de Ativos", href: "/ativos", icon: Package }] },
-        { label: "Configurações", items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }] },
+        {
+          label: "Sistema",
+          items: [{ name: "Configurações", href: "/config", icon: Settings }],
+        },
       ];
     }
 
-    if (role === "funcionario" || role === "zelador") {
-      return [
-        { label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] },
-        { label: "Operacional", items: [{ name: "Chamados", href: "/chamados", icon: Wrench }] },
-        { label: "Ativos", items: [{ name: "Ativos", href: "/ativos", icon: Package }] },
-      ];
-    }
-
-    // fallback
-    return [{ label: "Dashboard", items: [{ name: "Visão Geral", href: "/", icon: LayoutDashboard }] }];
+    return [
+      { label: "Painel", items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }] }
+    ];
   }, [role]);
 
-  // carrega nome do usuário
   useEffect(() => {
     (async () => {
       const { data: userResp } = await supabase.auth.getUser();
@@ -152,7 +137,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     })();
   }, []);
 
-  // garante current condominio válido
   useEffect(() => {
     if (!loading) {
       if (!current || (ids.length && !ids.includes(String(current)))) {
@@ -175,32 +159,34 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     <div
       className={`${
         collapsed ? "w-16" : "w-64"
-      } bg-white shadow-sm border-r flex flex-col transition-all duration-300`}
+      } bg-white border-r border-border flex flex-col transition-all duration-300 h-screen sticky top-0`}
     >
       {/* Logo */}
-      <div className="p-6 border-b">
+      <div className="h-16 px-6 border-b border-border flex items-center">
         <div className="flex items-center space-x-3">
-          <Building2 className="h-8 w-8 text-primary flex-shrink-0" />
+          <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+            <Building2 className="h-5 w-5 text-white" />
+          </div>
           {!collapsed && (
             <div>
-              <h1 className="text-xl font-bold text-foreground">CondoMaintain</h1>
-              <p className="text-xs text-muted-foreground">Gestão de Manutenções</p>
+              <h1 className="text-lg font-bold">CondoMaintain</h1>
+              <p className="text-xs text-muted-foreground">NBR 5674</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Navegação por seções */}
+      {/* Navegação */}
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
           <Section key={group.label} label={group.label} collapsed={collapsed} items={group.items} />
         ))}
       </nav>
 
-      {/* Rodapé: seletor de condomínio + usuário + sair */}
-      <div className="p-4 border-t space-y-3">
-        {/* Condomínio (não mostra para owner) */}
-        {!collapsed && role !== "owner" && (
+      {/* Rodapé */}
+      <div className="p-4 border-t border-border space-y-3">
+        {/* Seletor de condomínio */}
+        {!collapsed && role !== "owner" && role !== "admin" && (
           <div className="mb-3">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
               Condomínio
@@ -230,31 +216,20 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         {!collapsed && (
           <div className="mb-3">
             <p className="text-sm font-medium text-foreground">{userName}</p>
-            <p className="text-xs text-muted-foreground">
-              {role === "owner"
-                ? "Dono do Sistema"
-                : role === "admin"
-                ? "Administrador"
-                : role === "sindico"
-                ? "Síndico"
-                : role === "funcionario" || role === "zelador"
-                ? "Funcionário"
-                : "Usuário"}
-            </p>
+            <p className="text-xs text-muted-foreground capitalize">{role}</p>
           </div>
         )}
 
         {/* Sair */}
-        <button
-          className={`w-full flex items-center ${
-            collapsed ? "justify-center" : "gap-2"
-          } rounded-lg px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors`}
+        <Button
+          variant="ghost"
+          className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} text-destructive hover:text-destructive hover:bg-destructive/10`}
           onClick={handleLogout}
           title={collapsed ? "Sair" : undefined}
         >
-          <LogOut className="h-4 w-4 flex-shrink-0" />
-          {!collapsed && <span>Sair</span>}
-        </button>
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Sair</span>}
+        </Button>
       </div>
     </div>
   );
