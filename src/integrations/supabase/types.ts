@@ -1846,11 +1846,48 @@ export type Database = {
         }
         Returns: undefined
       }
+      criar_planos_preventivos: {
+        Args: { p_condominio_id: string }
+        Returns: undefined
+      }
       generate_maintenance_plans_for_asset: {
         Args: { ativo_id: string }
         Returns: undefined
       }
       generate_os_numero: { Args: { p_condominio_id: string }; Returns: string }
+      get_maintenance_stats: {
+        Args: { p_condominio_id: string }
+        Returns: {
+          conformidade_percent: number
+          os_abertas: number
+          planos_preventivos: number
+          total_ativos: number
+        }[]
+      }
+      get_non_conformities: {
+        Args: { p_condominio_id: string }
+        Returns: {
+          ativo_id: string
+          ativo_nome: string
+          dias_atrasado: number
+          gravidade: string
+          nbr_codigo: string
+          tipo_nome: string
+        }[]
+      }
+      get_upcoming_maintenances: {
+        Args: { p_condominio_id: string; p_days_ahead?: number }
+        Returns: {
+          ativo_nome: string
+          ativo_tipo: string
+          criticidade: string
+          days_until: number
+          id: string
+          proxima_execucao: string
+          status: string
+          titulo: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

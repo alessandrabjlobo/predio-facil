@@ -30,6 +30,7 @@ import HomeRedirect from "@/pages/HomeRedirect";
 import Manutencoes from "@/pages/Manutencoes";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import Agenda from "@/pages/agenda";
+import ManutencaoPredial from "@/pages/ManutencaoPredial";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +113,7 @@ export default function App() {
                 <Route path="preventivas" element={<Preventivas />} />
                 <Route path="manutencoes" element={<Manutencoes />} />
                 <Route path="agenda" element={<Agenda />} />
+                <Route path="manutencao-predial" element={<ManutencaoPredial />} />
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
               </Route>
