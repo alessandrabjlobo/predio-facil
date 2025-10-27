@@ -223,20 +223,21 @@ export default function AdminMaster() {
       <KPICards data={kpis} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="condominios">
-            <Building2 className="h-4 w-4 mr-2" />
-            Condomínios
-          </TabsTrigger>
-          <TabsTrigger value="usuarios">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Síndicos & Usuários
-          </TabsTrigger>
-          <TabsTrigger value="templates">
-            <Settings className="h-4 w-4 mr-2" />
-            Templates de Manutenção
-          </TabsTrigger>
-        </TabsList>
+      <TabsList>
+  <TabsTrigger value="condominios">
+    <Building2 className="h-4 w-4 mr-2" />
+    Condomínios
+  </TabsTrigger>
+  <TabsTrigger value="usuarios">
+    <Users className="h-4 w-4 mr-2" />
+    Usuários
+  </TabsTrigger>
+  <TabsTrigger value="templates">
+    <Settings className="h-4 w-4 mr-2" />
+    Templates de Manutenção
+  </TabsTrigger>
+</TabsList>
+
 
         {/* CONDOMÍNIOS */}
         <TabsContent value="condominios" className="mt-6">
