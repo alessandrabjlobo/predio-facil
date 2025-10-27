@@ -4,8 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 
-type Role = "sindico" | "funcionario" | "morador" | "fornecedor";
-
 export default function SignUp() {
   const nav = useNavigate();
 
@@ -13,7 +11,6 @@ export default function SignUp() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmSenha, setConfirmSenha] = useState("");
-  const [papel, setPapel] = useState<Role>("morador");
 
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,47 +38,24 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      // Cria conta no Supabase e grava metadados (nome/papel)
       const { data, error } = await supabase.auth.signUp({
         email,
         password: senha,
         options: {
-          data: { nome, papel }, // fica salvo como user_metadata (útil se confirmação de e-mail estiver ativa)
-          emailRedirectTo: window.location.origin, // ajuste se tiver rota dedicada
+          data: { nome },
+          emailRedirectTo: window.location.origin,
         },
       });
+      
       if (error) throw error;
 
-      const authUserId = data.user?.id || null;
       const temSessao = !!data.session;
 
-      // Tenta criar/atualizar perfil na tabela "usuarios" se já houver sessão (projetos sem confirmação por e-mail)
-      if (temSessao && authUserId) {
-        const { error: upsertErr } = await supabase
-          .from("usuarios")
-          .upsert(
-            {
-              auth_user_id: authUserId,
-              email,
-              nome,
-              papel,
-            },
-            { onConflict: "auth_user_id" }
-          );
-        if (upsertErr) {
-          // Não impede o fluxo — perfil poderá ser criado no primeiro login via getOrCreatePerfil()
-          console.warn("Falha ao upsert do perfil (usuarios). Será criado no primeiro login.", upsertErr.message);
-        }
-      }
-
-      // Mensagem amigável dependendo do fluxo de confirmação
       if (temSessao) {
-        // Sessão criada imediatamente: pode seguir para o app
-        alert("Conta criada com sucesso! Você já pode usar o sistema.");
+        alert("Conta criada com sucesso! Um administrador precisará atribuir suas permissões.");
         nav("/", { replace: true });
       } else {
-        // Comum quando confirmação por e-mail está habilitada
-        alert("Conta criada! Verifique seu e-mail para confirmar o cadastro. Depois, faça login.");
+        alert("Conta criada! Verifique seu e-mail para confirmar o cadastro.");
         nav("/login", { replace: true });
       }
     } catch (err: any) {
@@ -164,23 +138,6 @@ export default function SignUp() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Papel</label>
-            <select
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-gray-900/20"
-              value={papel}
-              onChange={(e) => setPapel(e.target.value as Role)}
-            >
-              <option value="sindico">Síndico</option>
-              <option value="funcionario">Funcionário</option>
-              <option value="morador">Morador</option>
-              <option value="fornecedor">Fornecedor</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Isso personaliza o seu menu e permissões dentro do sistema.
-            </p>
-          </div>
-
           <Button
             type="submit"
             disabled={loading}
@@ -188,6 +145,10 @@ export default function SignUp() {
           >
             {loading ? "Criando conta..." : "Criar conta"}
           </Button>
+          
+          <p className="text-xs text-center text-gray-500 mt-2">
+            Após o cadastro, um administrador atribuirá suas permissões de acesso.
+          </p>
         </form>
 
         <div className="mt-6 text-center text-sm">
