@@ -1,9 +1,8 @@
-// src/components/RequireRole.tsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { type Papel } from "@/lib/types";
-import { getCurrentCondominioId } from "@/lib/tenant";
+import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 
 export default function RequireRole({
   allowed,
@@ -14,27 +13,46 @@ export default function RequireRole({
 }) {
   const [loading, setLoading] = useState(true);
   const [temAcesso, setTemAcesso] = useState<boolean>(false);
-  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !mounted) return;
+        if (!user || !mounted) {
+          setLoading(false);
+          return;
+        }
 
-        // pega o perfil (id interno)
         const { data: usuario } = await supabase
           .from("usuarios")
           .select("id")
           .eq("auth_user_id", user.id)
           .maybeSingle();
 
-        if (!usuario || !mounted) return;
+        if (!usuario || !mounted) {
+          setLoading(false);
+          return;
+        }
 
-        const condominioAtual = getCurrentCondominioId();
+        let condominioAtual = getCurrentCondominioId();
 
-        // 1) se tem condomínio atual, verifica papel nesse condomínio
+        // Se não houver condomínio salvo, buscar o principal
+        if (!condominioAtual) {
+          const { data: principal } = await supabase
+            .from("usuarios_condominios")
+            .select("condominio_id")
+            .eq("usuario_id", usuario.id)
+            .eq("is_principal", true)
+            .maybeSingle();
+
+          if (principal?.condominio_id) {
+            setCurrentCondominioId(principal.condominio_id);
+            condominioAtual = principal.condominio_id;
+          }
+        }
+
+        // Verificar papel no condomínio atual
         if (condominioAtual) {
           const { data: rel } = await supabase
             .from("usuarios_condominios")
@@ -46,11 +64,12 @@ export default function RequireRole({
           const papelAtual = rel?.papel as Papel | undefined;
           if (papelAtual && allowed.includes(papelAtual)) {
             if (mounted) setTemAcesso(true);
+            setLoading(false);
             return;
           }
         }
 
-        // 2) fallback: qualquer relação com papel permitido em QUALQUER condomínio
+        // Fallback: verificar qualquer vínculo com papel permitido
         const { data: rels } = await supabase
           .from("usuarios_condominios")
           .select("papel")
@@ -60,11 +79,16 @@ export default function RequireRole({
           allowed.includes((r.papel as Papel) || "morador")
         );
 
-        if (mounted) setTemAcesso(algumPapelValido);
+        if (mounted) {
+          setTemAcesso(algumPapelValido);
+          setLoading(false);
+        }
       } catch (e: any) {
-        if (mounted) setErro(e?.message ?? "Erro ao checar permissões");
-      } finally {
-        if (mounted) setLoading(false);
+        console.error("Erro ao checar permissões:", e);
+        if (mounted) {
+          setTemAcesso(false);
+          setLoading(false);
+        }
       }
     })();
 
@@ -75,13 +99,16 @@ export default function RequireRole({
 
   if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-8 text-gray-600">
-        Carregando permissões...
+      <div className="w-full h-full flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando permissões...</p>
+        </div>
       </div>
     );
   }
 
-  if (erro || !temAcesso) {
+  if (!temAcesso) {
     return <Navigate to="/" replace />;
   }
 
