@@ -145,6 +145,58 @@ export function useUsuarios() {
     },
   });
 
+  const linkUsuarioCondominio = useMutation({
+    mutationFn: async (params: { 
+      usuario_id: string; 
+      condominio_id: string; 
+      papel: string;
+      is_principal?: boolean;
+    }) => {
+      const { error } = await supabase
+        .from("usuarios_condominios")
+        .insert({
+          usuario_id: params.usuario_id,
+          condominio_id: params.condominio_id,
+          papel: params.papel as any,
+          is_principal: params.is_principal || false,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      toast({ title: "Sucesso", description: "Usuário vinculado ao condomínio!" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao vincular usuário",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unlinkUsuarioCondominio = useMutation({
+    mutationFn: async (params: { usuario_id: string; condominio_id: string }) => {
+      const { error } = await supabase
+        .from("usuarios_condominios")
+        .delete()
+        .eq("usuario_id", params.usuario_id)
+        .eq("condominio_id", params.condominio_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["usuarios"] });
+      toast({ title: "Sucesso", description: "Vínculo removido!" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao remover vínculo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   return { 
     usuarios, 
     isLoading, 
@@ -152,5 +204,7 @@ export function useUsuarios() {
     updateUsuario, 
     deleteUsuario,
     assignRole,
+    linkUsuarioCondominio,
+    unlinkUsuarioCondominio,
   };
 }

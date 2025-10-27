@@ -349,6 +349,16 @@ export default function AdminMaster() {
 
         {/* USUÁRIOS */}
         <TabsContent value="usuarios" className="mt-6">
+          <div className="mb-4 p-4 border rounded bg-muted/30">
+            <p className="text-sm text-muted-foreground mb-2">
+              Para gestão completa de usuários, roles globais e vínculos com condomínios, acesse:
+            </p>
+            <Button onClick={() => window.location.href = "/admin/usuarios"}>
+              <Users className="h-4 w-4 mr-2" />
+              Gestão de Usuários
+            </Button>
+          </div>
+
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Input

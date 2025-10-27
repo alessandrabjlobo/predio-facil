@@ -1338,6 +1338,7 @@ export type Database = {
           template_origem: string | null
           tipo: Database["public"]["Enums"]["manut_tipo"]
           titulo: string
+          updated_at: string | null
         }
         Insert: {
           antecedencia_dias?: number | null
@@ -1358,6 +1359,7 @@ export type Database = {
           template_origem?: string | null
           tipo?: Database["public"]["Enums"]["manut_tipo"]
           titulo: string
+          updated_at?: string | null
         }
         Update: {
           antecedencia_dias?: number | null
@@ -1378,6 +1380,7 @@ export type Database = {
           template_origem?: string | null
           tipo?: Database["public"]["Enums"]["manut_tipo"]
           titulo?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1691,6 +1694,7 @@ export type Database = {
         Args: { p_ativo_id: string }
         Returns: string
       }
+      atualizar_status_programacao_atrasada: { Args: never; Returns: undefined }
       conf_adiar_proximo: {
         Args: { p_item_id: string; p_motivo?: string; p_nova_data: string }
         Returns: undefined

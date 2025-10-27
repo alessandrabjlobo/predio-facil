@@ -28,8 +28,8 @@ import Relatorios from "@/pages/Relatorios";
 import CondominioDetalhe from "@/pages/CondominioDetalhe";
 import AtivoDetalhe from "@/pages/AtivoDetalhe";
 import HomeRedirect from "@/pages/HomeRedirect";
-// (opcional) página de manutenções do síndico
-// import Manutencoes from "@/pages/Manutencoes";
+import Manutencoes from "@/pages/Manutencoes";
+import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,6 +84,14 @@ export default function App() {
                     </RequireOwner>
                   }
                 />
+                <Route
+                  path="admin/usuarios"
+                  element={
+                    <RequireOwner>
+                      <AdminUsuarios />
+                    </RequireOwner>
+                  }
+                />
 
                 {/* Dashboard do síndico */}
                 <Route
@@ -102,18 +110,9 @@ export default function App() {
                 <Route path="os" element={<OS />} />
                 <Route path="conformidade" element={<Conformidade />} />
                 <Route path="preventivas" element={<Preventivas />} />
+                <Route path="manutencoes" element={<Manutencoes />} />
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
-
-                {/* (opcional) Manutenções na visão do síndico */}
-                {/* <Route
-                  path="manutencoes"
-                  element={
-                    <RequireRole allowed={["sindico", "admin"]}>
-                      <Manutencoes />
-                    </RequireRole>
-                  }
-                /> */}
               </Route>
 
               <Route path="*" element={<Navigate to="/login" replace />} />
