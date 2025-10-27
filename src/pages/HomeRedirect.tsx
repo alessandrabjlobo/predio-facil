@@ -48,8 +48,8 @@ export default function HomeRedirect() {
         .maybeSingle();
 
       if (!vinculos) {
-        // Sem vínculo a condomínio, redireciona para chamados genérico
-        navigate("/chamados");
+        // Sem vínculo a condomínio, redireciona para rota existente
+        navigate("/os");
         return;
       }
 
@@ -64,7 +64,7 @@ export default function HomeRedirect() {
       } else if (papel === "zelador" || papel === "funcionario") {
         navigate("/manutencoes");
       } else {
-        navigate("/chamados");
+        navigate("/os");
       }
     })();
   }, [navigate]);
