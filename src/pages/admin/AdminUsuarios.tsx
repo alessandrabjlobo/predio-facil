@@ -35,25 +35,20 @@ export default function AdminUsuarios() {
     );
   }, [usuarios, search]);
 
-  async function handleCreateUser(e: React.FormEvent) {
-    e.preventDefault();
-    await createUsuario.mutateAsync({
-      email: newUserForm.email,
-      password: newUserForm.senha,
-      metadata: { nome: newUserForm.nome },
-    });
-    
-    // Se marcou admin, atribuir role
-    if (newUserForm.isAdmin) {
-      const created = usuarios?.find((u: any) => u.email === newUserForm.email);
-      if (created) {
-        await assignRole.mutateAsync({ user_id: created.id, role: "admin" });
-      }
-    }
-    
-    setOpenNewUser(false);
-    setNewUserForm({ nome: "", email: "", senha: "", isAdmin: false });
-  }
+async function handleCreateUser(e: React.FormEvent) {
+  e.preventDefault();
+  
+  await createUsuario.mutateAsync({
+    email: newUserForm.email,
+    password: newUserForm.senha,
+    metadata: { nome: newUserForm.nome },
+    globalRole: newUserForm.isAdmin ? "admin" : undefined, // Atribuir role global apenas se for admin
+  });
+  
+  setOpenNewUser(false);
+  setNewUserForm({ nome: "", email: "", senha: "", isAdmin: false });
+}
+
 
   async function handleAssignRole(userId: string, role: string) {
     await assignRole.mutateAsync({ user_id: userId, role });
