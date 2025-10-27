@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { type Papel } from "@/lib/types";
 import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
@@ -109,7 +108,16 @@ export default function RequireRole({
   }
 
   if (!temAcesso) {
-    return <Navigate to="/" replace />;
+    return (
+      <div className="w-full h-full flex items-center justify-center p-10">
+        <div className="text-center space-y-2">
+          <h2 className="text-lg font-semibold">Acesso negado</h2>
+          <p className="text-muted-foreground">
+            Você não tem permissão para acessar esta página com seu papel atual.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
