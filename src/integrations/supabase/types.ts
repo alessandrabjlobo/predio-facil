@@ -1846,6 +1846,43 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_multiple_assets: {
+        Args: { p_assets: Json[]; p_condominio_id: string }
+        Returns: {
+          andar: string | null
+          condominio_id: string | null
+          created_at: string | null
+          data_instalacao: string | null
+          descricao: string | null
+          extintor_capacidade: string | null
+          extintor_tipo: string | null
+          fabricante: string | null
+          id: string
+          identificador: string | null
+          is_ativo: boolean | null
+          local: string | null
+          modelo: string | null
+          nome: string
+          numero_serie: string | null
+          observacoes: string | null
+          proxima_manutencao: string | null
+          requer_conformidade: boolean | null
+          status_conformidade: string | null
+          tipo_id: string | null
+          tipo_uso: string | null
+          torre: string | null
+          ultima_manutencao: string | null
+          validade_carga: string | null
+          validade_teste_hidrostatico: string | null
+          zona_localizacao: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ativos"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       criar_planos_preventivos: {
         Args: { p_condominio_id: string }
         Returns: undefined
