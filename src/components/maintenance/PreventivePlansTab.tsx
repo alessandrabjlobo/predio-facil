@@ -7,15 +7,15 @@ import { Calendar, Clock, User, FileCheck, Plus, Search } from "lucide-react";
 import { usePlanosManutencao } from "@/hooks/usePlanosManutencao";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { GerarOSDialog } from "@/components/manutencoes/GerarOSDialog";
+import { CreateOSDialog } from "@/components/maintenance/CreateOSDialog";
 import { PlansTableView } from "@/components/maintenance/PlansTableView";
 import { ViewToggle } from "@/components/patterns/ViewToggle";
 
 export function PreventivePlansTab() {
   const { planos, isLoading } = usePlanosManutencao();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPlano, setSelectedPlano] = useState<any>(null);
-  const [osDialogOpen, setOsDialogOpen] = useState(false);
+  const [createOSOpen, setCreateOSOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<any>(null);
   
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'card'>(() => {
@@ -68,8 +68,8 @@ export function PreventivePlansTab() {
   }
 
   const handleGenerateOS = (plano: any) => {
-    setSelectedPlano(plano);
-    setOsDialogOpen(true);
+    setSelectedPlan(plano);
+    setCreateOSOpen(true);
   };
 
   return (
@@ -164,13 +164,15 @@ export function PreventivePlansTab() {
         />
       )}
 
-      {selectedPlano && (
-        <GerarOSDialog
-          open={osDialogOpen}
-          onOpenChange={setOsDialogOpen}
-          manutencao={selectedPlano}
-        />
-      )}
+      <CreateOSDialog
+        open={createOSOpen}
+        onOpenChange={setCreateOSOpen}
+        ativo={selectedPlan?.ativo || selectedPlan?.ativos}
+        plano={selectedPlan}
+        onSuccess={() => {
+          setCreateOSOpen(false);
+        }}
+      />
     </div>
   );
 }

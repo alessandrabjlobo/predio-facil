@@ -21,10 +21,11 @@ interface AssetCardViewProps {
   ativos: Asset[];
   nbrMapping: Map<string, { nbr_codigo: string; requisito_descricao: string }[]>;
   onAssetClick: (ativo: Asset) => void;
+  onCreateOS?: (ativo: Asset) => void;
   isLoading?: boolean;
 }
 
-export function AssetCardView({ ativos, nbrMapping, onAssetClick, isLoading }: AssetCardViewProps) {
+export function AssetCardView({ ativos, nbrMapping, onAssetClick, onCreateOS, isLoading }: AssetCardViewProps) {
   if (isLoading) {
     return (
       <div className="text-center py-8 text-muted-foreground">Carregando ativos...</div>
@@ -152,11 +153,11 @@ export function AssetCardView({ ativos, nbrMapping, onAssetClick, isLoading }: A
                   className="flex-1"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // TODO: Open OS
+                    onCreateOS?.(ativo);
                   }}
                 >
                   <Wrench className="h-3 w-3 mr-1" />
-                  Abrir OS
+                  Gerar OS
                 </Button>
               </div>
             </CardContent>

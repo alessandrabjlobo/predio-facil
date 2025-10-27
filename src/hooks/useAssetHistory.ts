@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export const useAssetHistory = (ativoId?: string) => {
+export const useAssetHistory = (ativoId?: string, limit?: number) => {
   return useQuery({
-    queryKey: ["asset-history", ativoId],
+    queryKey: ["asset-history", ativoId, limit],
     queryFn: async () => {
-      if (!ativoId) return [];
+      if (!ativoId) return { data: [], count: 0 };
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("os")
         .select(`
           id,
@@ -17,15 +17,22 @@ export const useAssetHistory = (ativoId?: string) => {
           status_validacao,
           data_abertura,
           data_conclusao,
+          origem,
+          prioridade,
           executante:executante_id(nome),
           plano:plano_id(titulo, periodicidade)
-        `)
+        `, { count: 'exact' })
         .eq("ativo_id", ativoId)
-        .order("data_abertura", { ascending: false })
-        .limit(10);
+        .order("data_abertura", { ascending: false });
+
+      if (limit) {
+        query = query.limit(limit);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      return data || [];
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!ativoId,
   });

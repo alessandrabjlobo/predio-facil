@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,11 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { FileText, Calendar, User, CheckCircle2, Clock, AlertCircle, Wrench } from "lucide-react";
+import { FileText, Calendar, User, CheckCircle2, Clock, AlertCircle, Wrench, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNBRRequisitosByTipo } from "@/hooks/useNBRRequisitos";
 import { useAssetHistory } from "@/hooks/useAssetHistory";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { CreateOSDialog } from "./CreateOSDialog";
 
 interface AssetChecklistModalProps {
   open: boolean;
@@ -24,9 +26,18 @@ interface AssetChecklistModalProps {
 export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklistModalProps) {
   const ativoTipoSlug = ativo?.ativo_tipos?.slug;
   const { data: nbrRequisitos, isLoading: isLoadingNBR } = useNBRRequisitosByTipo(ativoTipoSlug);
-  const { data: history, isLoading: isLoadingHistory } = useAssetHistory(ativo?.id);
+  const [historyPage, setHistoryPage] = useState(0);
+  const pageSize = 10;
+  const { data: historyData, isLoading: isLoadingHistory } = useAssetHistory(ativo?.id);
+  const [createOSOpen, setCreateOSOpen] = useState(false);
+  const [selectedNBR, setSelectedNBR] = useState<any>(null);
 
   if (!ativo) return null;
+
+  const history = historyData?.data || [];
+  const totalHistory = historyData?.count || 0;
+  const totalPages = Math.ceil(totalHistory / pageSize);
+  const paginatedHistory = history.slice(historyPage * pageSize, (historyPage + 1) * pageSize);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -160,7 +171,14 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
                         </div>
                       )}
 
-                      <Button size="sm" className="w-full mt-3">
+                      <Button 
+                        size="sm" 
+                        className="w-full mt-3"
+                        onClick={() => {
+                          setSelectedNBR(nbr);
+                          setCreateOSOpen(true);
+                        }}
+                      >
                         <Wrench className="h-3 w-3 mr-2" />
                         Gerar OS para este NBR
                       </Button>
@@ -173,14 +191,39 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
 
           {/* Maintenance History */}
           <div>
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <Clock className="h-5 w-5 text-primary" />
-              Histórico de Manutenções ({history?.length || 0})
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Clock className="h-5 w-5 text-primary" />
+                Histórico de Manutenções ({totalHistory})
+              </h3>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setHistoryPage(Math.max(0, historyPage - 1))}
+                    disabled={historyPage === 0}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Página {historyPage + 1} de {totalPages}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setHistoryPage(Math.min(totalPages - 1, historyPage + 1))}
+                    disabled={historyPage >= totalPages - 1}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
             
             {isLoadingHistory ? (
               <div className="text-center py-4 text-muted-foreground">Carregando histórico...</div>
-            ) : !history || history.length === 0 ? (
+            ) : !paginatedHistory || paginatedHistory.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   Nenhuma manutenção executada ainda
@@ -188,7 +231,7 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
               </Card>
             ) : (
               <div className="space-y-2">
-                {history.map((os: any) => (
+                {paginatedHistory.map((os: any) => (
                   <Card key={os.id} className="hover:shadow-md transition-shadow">
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
@@ -237,6 +280,17 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
             )}
           </div>
         </div>
+
+        {/* Create OS Dialog for NBR */}
+        <CreateOSDialog
+          open={createOSOpen}
+          onOpenChange={setCreateOSOpen}
+          ativo={ativo}
+          onSuccess={() => {
+            setCreateOSOpen(false);
+            // Optionally refresh history
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

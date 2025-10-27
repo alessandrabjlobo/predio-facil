@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, FileText, Plus } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { useAtivos } from "@/hooks/useAtivos";
 import { useNBRRequisitos } from "@/hooks/useNBRRequisitos";
 import { AssetTableView } from "@/components/AssetTableView";
@@ -9,6 +9,7 @@ import { AssetCardView } from "@/components/maintenance/AssetCardView";
 import { ViewToggle } from "@/components/patterns/ViewToggle";
 import { AddAssetDialog } from "@/components/maintenance/AddAssetDialog";
 import { AssetChecklistModal } from "@/components/maintenance/AssetChecklistModal";
+import { CreateOSDialog } from "@/components/maintenance/CreateOSDialog";
 
 export function AssetsTab() {
   const { ativos, isLoading } = useAtivos();
@@ -17,6 +18,8 @@ export function AssetsTab() {
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
   const [addAssetDialogOpen, setAddAssetDialogOpen] = useState(false);
+  const [createOSDialogOpen, setCreateOSDialogOpen] = useState(false);
+  const [osAsset, setOsAsset] = useState<any>(null);
   
   // View mode with localStorage persistence
   const [viewMode, setViewMode] = useState<'list' | 'card'>(() => {
@@ -54,6 +57,11 @@ export function AssetsTab() {
     setChecklistDialogOpen(true);
   };
 
+  const handleCreateOS = (ativo: any) => {
+    setOsAsset(ativo);
+    setCreateOSDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -83,6 +91,7 @@ export function AssetsTab() {
           ativos={filteredAtivos || []}
           nbrMapping={nbrMapping}
           onAssetClick={handleAssetClick}
+          onCreateOS={handleCreateOS}
           isLoading={isLoading}
         />
       ) : (
@@ -90,6 +99,7 @@ export function AssetsTab() {
           ativos={filteredAtivos || []}
           nbrMapping={nbrMapping}
           onAssetClick={handleAssetClick}
+          onCreateOS={handleCreateOS}
           isLoading={isLoading}
         />
       )}
@@ -99,6 +109,17 @@ export function AssetsTab() {
         open={checklistDialogOpen}
         onOpenChange={setChecklistDialogOpen}
         ativo={selectedAsset}
+      />
+
+      {/* Create OS Dialog */}
+      <CreateOSDialog
+        open={createOSDialogOpen}
+        onOpenChange={setCreateOSDialogOpen}
+        ativo={osAsset}
+        onSuccess={() => {
+          setCreateOSDialogOpen(false);
+          // Refresh data if needed
+        }}
       />
     </div>
   );

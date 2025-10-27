@@ -1883,6 +1883,29 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      criar_os_detalhada: {
+        Args: {
+          p_ativo_id: string
+          p_checklist_items?: Json
+          p_condominio_id: string
+          p_data_prevista?: string
+          p_descricao?: string
+          p_executor_contato?: string
+          p_executor_nome?: string
+          p_nbr_referencias?: string[]
+          p_plano_id?: string
+          p_prioridade?: string
+          p_tipo_executor?: string
+          p_tipo_manutencao?: string
+          p_titulo: string
+        }
+        Returns: {
+          message: string
+          os_id: string
+          os_numero: string
+          success: boolean
+        }[]
+      }
       criar_planos_preventivos: {
         Args: { p_condominio_id: string }
         Returns: undefined

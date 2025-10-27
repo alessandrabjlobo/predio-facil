@@ -2,7 +2,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ShieldAlert, MapPin, Calendar, User, FileText, Wrench } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ShieldAlert, MapPin, Calendar, FileText, Wrench, MoreVertical, Eye, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -22,10 +28,11 @@ interface AssetTableViewProps {
   ativos: Asset[];
   nbrMapping: Map<string, { nbr_codigo: string; requisito_descricao: string }[]>;
   onAssetClick: (ativo: Asset) => void;
+  onCreateOS?: (ativo: Asset) => void;
   isLoading?: boolean;
 }
 
-export function AssetTableView({ ativos, nbrMapping, onAssetClick, isLoading }: AssetTableViewProps) {
+export function AssetTableView({ ativos, nbrMapping, onAssetClick, onCreateOS, isLoading }: AssetTableViewProps) {
   if (isLoading) {
     return (
       <Card className="p-8">
@@ -165,17 +172,37 @@ export function AssetTableView({ ativos, nbrMapping, onAssetClick, isLoading }: 
                   </TableCell>
                   
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAssetClick(ativo);
-                      }}
-                    >
-                      <Wrench className="h-4 w-4 mr-1" />
-                      Detalhes
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAssetClick(ativo);
+                          }}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCreateOS?.(ativo);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Gerar OS
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
