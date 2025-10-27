@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, FileText, Plus } from "lucide-react";
 import { useAtivos } from "@/hooks/useAtivos";
 import { useNBRRequisitos } from "@/hooks/useNBRRequisitos";
 import { AssetTableView } from "@/components/AssetTableView";
+import { AssetCardView } from "@/components/maintenance/AssetCardView";
+import { ViewToggle } from "@/components/patterns/ViewToggle";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,16 @@ export function AssetsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [checklistDialogOpen, setChecklistDialogOpen] = useState(false);
+  
+  // View mode with localStorage persistence
+  const [viewMode, setViewMode] = useState<'list' | 'card'>(() => {
+    const saved = localStorage.getItem('maintenance_assets_view');
+    return (saved as 'list' | 'card') || 'list';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('maintenance_assets_view', viewMode);
+  }, [viewMode]);
 
   // Create NBR mapping
   const nbrMapping = new Map<string, { nbr_codigo: string; requisito_descricao: string }[]>();
@@ -62,18 +74,28 @@ export function AssetsTab() {
             className="pl-10"
           />
         </div>
+        <ViewToggle view={viewMode} onViewChange={setViewMode} />
         <Button>
           <Plus className="h-4 w-4 mr-2" />
           Novo Ativo
         </Button>
       </div>
 
-      <AssetTableView
-        ativos={filteredAtivos || []}
-        nbrMapping={nbrMapping}
-        onAssetClick={handleAssetClick}
-        isLoading={isLoading}
-      />
+      {viewMode === 'list' ? (
+        <AssetTableView
+          ativos={filteredAtivos || []}
+          nbrMapping={nbrMapping}
+          onAssetClick={handleAssetClick}
+          isLoading={isLoading}
+        />
+      ) : (
+        <AssetCardView
+          ativos={filteredAtivos || []}
+          nbrMapping={nbrMapping}
+          onAssetClick={handleAssetClick}
+          isLoading={isLoading}
+        />
+      )}
 
       {/* Checklist Dialog */}
       <Dialog open={checklistDialogOpen} onOpenChange={setChecklistDialogOpen}>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,24 @@ import { usePlanosManutencao } from "@/hooks/usePlanosManutencao";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { GerarOSDialog } from "@/components/manutencoes/GerarOSDialog";
+import { PlansTableView } from "@/components/maintenance/PlansTableView";
+import { ViewToggle } from "@/components/patterns/ViewToggle";
 
 export function PreventivePlansTab() {
   const { planos, isLoading } = usePlanosManutencao();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPlano, setSelectedPlano] = useState<any>(null);
   const [osDialogOpen, setOsDialogOpen] = useState(false);
+  
+  // View mode with localStorage persistence
+  const [viewMode, setViewMode] = useState<'list' | 'card'>(() => {
+    const saved = localStorage.getItem('maintenance_plans_view');
+    return (saved as 'list' | 'card') || 'card';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('maintenance_plans_view', viewMode);
+  }, [viewMode]);
 
   const getPeriodicidadeLabel = (periodicidade: any) => {
     if (!periodicidade) return 'N/A';
@@ -55,6 +67,11 @@ export function PreventivePlansTab() {
     return <div className="text-center py-8 text-muted-foreground">Carregando planos...</div>;
   }
 
+  const handleGenerateOS = (plano: any) => {
+    setSelectedPlano(plano);
+    setOsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -67,6 +84,7 @@ export function PreventivePlansTab() {
             className="pl-10"
           />
         </div>
+        <ViewToggle view={viewMode} onViewChange={setViewMode} />
         <Button>
           <Plus className="h-4 w-4 mr-2" />
           Novo Plano
@@ -84,7 +102,7 @@ export function PreventivePlansTab() {
             </p>
           </CardContent>
         </Card>
-      ) : (
+      ) : viewMode === 'card' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredPlanos.map((plano) => (
             <Card key={plano.id} className={`hover:shadow-md transition-shadow ${getStatusColor(plano.proxima_execucao)}`}>
@@ -129,10 +147,7 @@ export function PreventivePlansTab() {
                   <Button
                     className="w-full"
                     size="sm"
-                    onClick={() => {
-                      setSelectedPlano(plano);
-                      setOsDialogOpen(true);
-                    }}
+                    onClick={() => handleGenerateOS(plano)}
                   >
                     Gerar OS
                   </Button>
@@ -141,6 +156,12 @@ export function PreventivePlansTab() {
             </Card>
           ))}
         </div>
+      ) : (
+        <PlansTableView
+          planos={filteredPlanos}
+          onGenerateOS={handleGenerateOS}
+          isLoading={isLoading}
+        />
       )}
 
       {selectedPlano && (
