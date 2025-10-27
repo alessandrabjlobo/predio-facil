@@ -348,16 +348,20 @@ export default function AdminMaster() {
           </div>
         </TabsContent>
 
-        {/* USUÁRIOS */}
-        <TabsContent value="usuarios" className="mt-6">
-          <div className="mb-4 p-4 border rounded bg-muted/30">
-            <p className="text-sm text-muted-foreground mb-2">
-              Para gestão completa de usuários, roles globais e vínculos com condomínios, acesse:
-            </p>
-            <Button onClick={() => window.location.href = "/admin/usuarios"}>
-              <Users className="h-4 w-4 mr-2" />
-              Gestão de Usuários
-            </Button>
+       {/* USUÁRIOS */}
+<TabsContent value="usuarios" className="mt-6">
+  <div className="p-6 border rounded bg-blue-50 dark:bg-blue-950/20">
+    <h3 className="font-semibold mb-2">Gestão Completa de Usuários</h3>
+    <p className="text-sm text-muted-foreground mb-4">
+      Para gerenciar usuários, atribuir roles globais e vincular a condomínios, acesse:
+    </p>
+    <Button onClick={() => window.location.href = "/admin/usuarios"}>
+      <Users className="h-4 w-4 mr-2" />
+      Ir para Gestão de Usuários
+    </Button>
+  </div>
+</TabsContent>
+
           </div>
 
           <div className="flex items-center justify-between mb-3">
