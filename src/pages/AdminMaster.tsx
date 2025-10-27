@@ -65,7 +65,6 @@ export default function AdminMaster() {
     deleteUsuario,
   } = useUsuarios();
 
-  // KPIs de negócio (sem dados operacionais do dia a dia)
   const totalCondominios = condominios?.length || 0;
   const totalUsuarios = usuarios?.length || 0;
   const totalSindicos = (usuarios || []).filter(
@@ -78,7 +77,6 @@ export default function AdminMaster() {
     { label: "Síndicos", value: totalSindicos, icon: UserPlus },
   ];
 
-  // Filtros
   const [qConds, setQConds] = useState("");
   const [qUsers, setQUsers] = useState("");
 
@@ -104,7 +102,6 @@ export default function AdminMaster() {
     });
   }, [usuarios, qUsers]);
 
-  // Modais
   const [openNewCondo, setOpenNewCondo] = useState(false);
   const [openEditCondo, setOpenEditCondo] = useState<CondoForm | null>(null);
   const [openEditUser, setOpenEditUser] = useState<any | null>(null);
@@ -219,25 +216,23 @@ export default function AdminMaster() {
         }
       />
 
-      {/* KPIs focados no negócio */}
       <KPICards data={kpis} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-      <TabsList>
-  <TabsTrigger value="condominios">
-    <Building2 className="h-4 w-4 mr-2" />
-    Condomínios
-  </TabsTrigger>
-  <TabsTrigger value="usuarios">
-    <Users className="h-4 w-4 mr-2" />
-    Usuários
-  </TabsTrigger>
-  <TabsTrigger value="templates">
-    <Settings className="h-4 w-4 mr-2" />
-    Templates de Manutenção
-  </TabsTrigger>
-</TabsList>
-
+        <TabsList>
+          <TabsTrigger value="condominios">
+            <Building2 className="h-4 w-4 mr-2" />
+            Condomínios
+          </TabsTrigger>
+          <TabsTrigger value="usuarios">
+            <Users className="h-4 w-4 mr-2" />
+            Usuários
+          </TabsTrigger>
+          <TabsTrigger value="templates">
+            <Settings className="h-4 w-4 mr-2" />
+            Templates de Manutenção
+          </TabsTrigger>
+        </TabsList>
 
         {/* CONDOMÍNIOS */}
         <TabsContent value="condominios" className="mt-6">
@@ -348,23 +343,20 @@ export default function AdminMaster() {
           </div>
         </TabsContent>
 
-       {/* USUÁRIOS */}
-<TabsContent value="usuarios" className="mt-6">
-  <div className="p-6 border rounded bg-blue-50 dark:bg-blue-950/20">
-    <h3 className="font-semibold mb-2">Gestão Completa de Usuários</h3>
-    <p className="text-sm text-muted-foreground mb-4">
-      Para gerenciar usuários, atribuir roles globais e vincular a condomínios, acesse:
-    </p>
-    <Button onClick={() => window.location.href = "/admin/usuarios"}>
-      <Users className="h-4 w-4 mr-2" />
-      Ir para Gestão de Usuários
-    </Button>
-  </div>
-</TabsContent>
-
+        {/* USUÁRIOS */}
+        <TabsContent value="usuarios" className="mt-6">
+          <div className="p-6 border rounded bg-blue-50 dark:bg-blue-950/20">
+            <h3 className="font-semibold mb-2">Gestão Completa de Usuários</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Para gerenciar usuários, atribuir roles globais e vincular a condomínios, acesse:
+            </p>
+            <Button onClick={() => (window.location.href = "/admin/usuarios")}>
+              <Users className="h-4 w-4 mr-2" />
+              Ir para Gestão de Usuários
+            </Button>
           </div>
 
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 mt-6">
             <div className="flex items-center gap-2">
               <Input
                 placeholder="Buscar usuário (nome/e-mail/papel)…"
@@ -531,7 +523,10 @@ export default function AdminMaster() {
                 <Input
                   value={condoForm.uf}
                   onChange={(e) =>
-                    setCondoForm((s) => ({ ...s, uf: e.target.value.toUpperCase() }))
+                    setCondoForm((s) => ({
+                      ...s,
+                      uf: e.target.value.toUpperCase(),
+                    }))
                   }
                 />
               </div>
@@ -645,7 +640,10 @@ export default function AdminMaster() {
                   <Input
                     value={openEditCondo.uf}
                     onChange={(e) =>
-                      setOpenEditCondo((s) => s && ({ ...s, uf: e.target.value.toUpperCase() }))
+                      setOpenEditCondo(
+                        (s) =>
+                          s && ({ ...s, uf: e.target.value.toUpperCase() })
+                      )
                     }
                   />
                 </div>
