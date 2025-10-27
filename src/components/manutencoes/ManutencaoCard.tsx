@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Calendar, FileText } from "lucide-react";
+import { CheckCircle, Calendar, FileText, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -9,7 +9,7 @@ interface ManutencaoCardProps {
   manutencao: any;
   onConcluir?: (id: string) => void;
   onRemarcar?: (id: string) => void;
-  onGerarOS?: (id: string) => void;
+  onGerarOS?: (manutencao: any) => void;
 }
 
 export function ManutencaoCard({ manutencao, onConcluir, onRemarcar, onGerarOS }: ManutencaoCardProps) {
@@ -46,7 +46,7 @@ export function ManutencaoCard({ manutencao, onConcluir, onRemarcar, onGerarOS }
         )}
 
         {manutencao.status === "pendente" && (
-          <div className="flex gap-2 pt-2 border-t">
+          <div className="flex gap-2 pt-2 border-t flex-wrap">
             {onConcluir && (
               <Button size="sm" onClick={() => onConcluir(manutencao.id)}>
                 <CheckCircle className="h-4 w-4 mr-1" />
@@ -60,10 +60,17 @@ export function ManutencaoCard({ manutencao, onConcluir, onRemarcar, onGerarOS }
               </Button>
             )}
             {onGerarOS && (
-              <Button size="sm" variant="secondary" onClick={() => onGerarOS(manutencao.id)}>
+              <Button size="sm" variant="secondary" onClick={() => onGerarOS(manutencao)}>
+                <ClipboardList className="h-4 w-4 mr-1" />
                 Gerar OS
               </Button>
             )}
+          </div>
+        )}
+
+        {manutencao.status === "concluida" && manutencao.observacoes && (
+          <div className="text-xs text-muted-foreground pt-2 border-t">
+            <strong>Observações:</strong> {manutencao.observacoes}
           </div>
         )}
       </div>
