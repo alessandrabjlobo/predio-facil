@@ -86,7 +86,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       return [
         {
           label: "Painel",
-          items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }],
+          items: [{ name: "Dashboard", href: "/dashboard/sindico", icon: LayoutDashboard }],
         },
         {
           label: "Operacional",
@@ -109,6 +109,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         },
       ];
     }
+
 
     return [
       { label: "Painel", items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }] }
