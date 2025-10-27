@@ -6,8 +6,17 @@ export function useManutencaoActions() {
   const queryClient = useQueryClient();
   
   const concluir = useMutation({
-    mutationFn: async ({ id, anexo }: { id: string; anexo?: File }) => {
+    mutationFn: async ({ 
+      id, 
+      anexo, 
+      observacoes 
+    }: { 
+      id: string; 
+      anexo?: File;
+      observacoes?: string;
+    }) => {
       // Upload de anexo se existir
+      let anexo_path: string | null = null;
       if (anexo) {
         const fileName = `${id}_${Date.now()}_${anexo.name}`;
         const { error: uploadError } = await supabase.storage
@@ -15,12 +24,7 @@ export function useManutencaoActions() {
           .upload(fileName, anexo);
         
         if (uploadError) throw uploadError;
-
-        // Atualizar caminho do anexo
-        await supabase
-          .from("manutencoes")
-          .update({ anexo_path: fileName })
-          .eq("id", id);
+        anexo_path = fileName;
       }
 
       // Concluir manutenção
@@ -29,6 +33,8 @@ export function useManutencaoActions() {
         .update({
           status: "concluida",
           executada_em: new Date().toISOString(),
+          ...(anexo_path && { anexo_path }),
+          ...(observacoes && { observacoes }),
         })
         .eq("id", id);
 
