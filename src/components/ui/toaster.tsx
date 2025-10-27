@@ -8,7 +8,8 @@ import {
 } from "@/components/ui/toast"
 import { useToast } from "@/hooks/use-toast"
 
-export function Toaster() {
+// Renomeado para evitar colisão com o Toaster do Sonner
+export function ShadcnToaster() {
   const { toasts } = useToast()
 
   return (
