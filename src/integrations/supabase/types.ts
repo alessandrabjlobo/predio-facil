@@ -973,6 +973,42 @@ export type Database = {
           },
         ]
       }
+      nbr_requisitos: {
+        Row: {
+          ativo_tipo_slug: string
+          checklist_items: Json | null
+          created_at: string | null
+          id: string
+          nbr_codigo: string
+          nbr_titulo: string
+          periodicidade_minima: unknown
+          requisito_descricao: string
+          responsavel_sugerido: string | null
+        }
+        Insert: {
+          ativo_tipo_slug: string
+          checklist_items?: Json | null
+          created_at?: string | null
+          id?: string
+          nbr_codigo: string
+          nbr_titulo: string
+          periodicidade_minima: unknown
+          requisito_descricao: string
+          responsavel_sugerido?: string | null
+        }
+        Update: {
+          ativo_tipo_slug?: string
+          checklist_items?: Json | null
+          created_at?: string | null
+          id?: string
+          nbr_codigo?: string
+          nbr_titulo?: string
+          periodicidade_minima?: unknown
+          requisito_descricao?: string
+          responsavel_sugerido?: string | null
+        }
+        Relationships: []
+      }
       ordens_servico: {
         Row: {
           anexos: Json | null
@@ -1828,6 +1864,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      inicializar_ativos_nbr_completo: {
+        Args: { p_condominio_id: string }
+        Returns: undefined
       }
       inicializar_ativos_padrao: {
         Args: { p_condominio_id: string }
