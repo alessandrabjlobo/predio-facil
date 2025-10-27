@@ -650,10 +650,8 @@ export default function AdminMaster() {
                 e.preventDefault();
                 await updateUsuario.mutateAsync({
                   id: openEditUser.id,
-                  patch: {
-                    nome: openEditUser.nome || null,
-                    email: openEditUser.email || null,
-                  },
+                  nome: openEditUser.nome || null,
+                  email: openEditUser.email || null,
                 });
                 setOpenEditUser(null);
               }}

@@ -7,10 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUsuarios } from "@/hooks/useUsuarios";
 import { useCondominios } from "@/hooks/useCondominios";
 import { Users, UserPlus, Link as LinkIcon, Edit3, Trash2, XCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 
 type Papel = "admin" | "conselho" | "fornecedor" | "funcionario" | "morador" | "sindico" | "zelador";
 
@@ -64,6 +65,18 @@ export default function AdminUsuarios() {
     });
     setOpenNewUser(false);
     setNewUserForm({ nome: "", email: "", senha: "", isAdmin: false });
+  }
+
+  async function handleUpdateUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!openEditUser?.id) return;
+    await updateUsuario.mutateAsync({
+      id: openEditUser.id,
+      email: openEditUser.email,
+      nome: openEditUser.nome,
+      cpf: openEditUser.cpf || null,
+    });
+    setOpenEditUser(null);
   }
 
   async function handleAssignRole(userId: string, role: "admin") {
@@ -165,7 +178,7 @@ export default function AdminUsuarios() {
                       </td>
                       <td className="text-xs">
                         {(u.usuarios_condominios || []).map((uc: any) => (
-                          <div key={`${uc.condominio_id}-${uc.papel}`} className="flex items-center gap-2">
+                          <div key={`${uc.condominio_id}-${uc.papel}`} className="flex items-center gap-2 mb-1">
                             <span>
                               {uc.condominios?.nome} ({uc.papel}
                               {uc.is_principal ? ", principal" : ""})
@@ -200,7 +213,16 @@ export default function AdminUsuarios() {
                               Remover Admin
                             </Button>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => setOpenEditUser(u)}>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setOpenEditUser({
+                              id: u.id,
+                              nome: u.nome || "",
+                              email: u.email || "",
+                              cpf: u.cpf || ""
+                            })}
+                          >
                             <Edit3 className="h-4 w-4 mr-1" />
                             Editar
                           </Button>
@@ -208,8 +230,17 @@ export default function AdminUsuarios() {
                             size="sm"
                             variant="destructive"
                             onClick={async () => {
-                              if (!window.confirm("Excluir este usuário?")) return;
-                              await deleteUsuario.mutateAsync(u.id);
+                              if (!window.confirm(`Excluir usuário ${u.nome || u.email}? Esta ação não pode ser desfeita. Os vínculos com condomínios e OSs serão preservados (executante ficará como NULL).`)) return;
+                              try {
+                                await deleteUsuario.mutateAsync(u.id);
+                                toast({ title: "Sucesso", description: "Usuário excluído com segurança." });
+                              } catch (error: any) {
+                                toast({ 
+                                  title: "Erro ao excluir", 
+                                  description: error.message,
+                                  variant: "destructive" 
+                                });
+                              }
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
@@ -236,6 +267,7 @@ export default function AdminUsuarios() {
             <div className="border rounded p-4">
               <p className="text-sm text-muted-foreground">
                 Vincule usuários a condomínios e defina papéis (síndico, zelador, morador, etc).
+                Use a tabela "Todos os Usuários" para visualizar e remover vínculos existentes.
               </p>
             </div>
           </div>
@@ -247,6 +279,9 @@ export default function AdminUsuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Criar Novo Usuário</DialogTitle>
+            <DialogDescription>
+              Preencha os dados do novo usuário. A senha inicial pode ser alterada posteriormente.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateUser} className="space-y-4">
             <div>
@@ -271,9 +306,11 @@ export default function AdminUsuarios() {
               <Input
                 type="password"
                 required
+                minLength={6}
                 value={newUserForm.senha}
                 onChange={(e) => setNewUserForm({ ...newUserForm, senha: e.target.value })}
               />
+              <p className="text-xs text-muted-foreground mt-1">Mínimo 6 caracteres</p>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -295,11 +332,61 @@ export default function AdminUsuarios() {
         </DialogContent>
       </Dialog>
 
+      {/* MODAL: Editar Usuário */}
+      <Dialog open={!!openEditUser} onOpenChange={() => setOpenEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do usuário. O email pode ser alterado se necessário.
+            </DialogDescription>
+          </DialogHeader>
+          {openEditUser && (
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <Label>Nome</Label>
+                <Input
+                  required
+                  value={openEditUser.nome}
+                  onChange={(e) => setOpenEditUser({ ...openEditUser, nome: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  required
+                  value={openEditUser.email}
+                  onChange={(e) => setOpenEditUser({ ...openEditUser, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>CPF (opcional)</Label>
+                <Input
+                  value={openEditUser.cpf}
+                  onChange={(e) => setOpenEditUser({ ...openEditUser, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setOpenEditUser(null)}>
+                  Cancelar
+                </Button>
+                <Button type="submit">Salvar</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* MODAL: Tornar Admin */}
       <Dialog open={!!openRoleDialog} onOpenChange={() => setOpenRoleDialog(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Tornar Admin Global</DialogTitle>
+            <DialogDescription>
+              Conceda permissões de administrador global para este usuário.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm">Usuário: <strong>{openRoleDialog?.email}</strong></p>
@@ -317,6 +404,9 @@ export default function AdminUsuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Vincular Usuário a Condomínio</DialogTitle>
+            <DialogDescription>
+              Selecione um usuário, condomínio e defina o papel (síndico, zelador, etc).
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleLinkUser} className="space-y-4">
             <div>
@@ -403,9 +493,11 @@ export default function AdminUsuarios() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Remover vínculo</DialogTitle>
+            <DialogDescription>
+              Confirma remover o vínculo deste usuário com o condomínio?
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm">Confirma remover o vínculo deste usuário com o condomínio?</p>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpenUnlinkDialog(null)}>
                 Cancelar

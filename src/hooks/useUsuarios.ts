@@ -88,13 +88,11 @@ export function useUsuarios() {
   const updateUsuario = useMutation({
     mutationFn: async (args: {
       id: string;
-      patch: {
-        email?: string;
-        cpf?: string;
-        nome?: string;
-      };
+      email?: string;
+      cpf?: string | null;
+      nome?: string;
     }) => {
-      const { id, patch } = args;
+      const { id, ...patch } = args;
       const { error } = await supabase.from("usuarios").update(patch).eq("id", id);
       if (error) throw error;
     },
