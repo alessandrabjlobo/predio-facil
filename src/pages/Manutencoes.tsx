@@ -7,10 +7,13 @@ import { useManutencoes } from "@/hooks/useManutencoes";
 import { ManutencaoCard } from "@/components/manutencoes/ManutencaoCard";
 import { ConcluirManutencaoDialog } from "@/components/manutencoes/ConcluirManutencaoDialog";
 import { RemarcarDialog } from "@/components/manutencoes/RemarcarDialog";
+import { GerarOSDialog } from "@/components/manutencoes/GerarOSDialog";
+import { ManutencaoCalendar } from "@/components/manutencoes/ManutencaoCalendar";
 
 export default function Manutencoes() {
   const [concluirDialogId, setConcluirDialogId] = useState<string | null>(null);
   const [remarcarDialogId, setRemarcarDialogId] = useState<string | null>(null);
+  const [gerarOSManutencao, setGerarOSManutencao] = useState<any>(null);
 
   const { data: pendentes, isLoading: loadingPendentes } = useManutencoes({ status: "pendente" });
   const { data: emExecucao, isLoading: loadingExecucao } = useManutencoes({ status: "em_execucao" });
@@ -34,6 +37,7 @@ export default function Manutencoes() {
                   manutencao={m}
                   onConcluir={setConcluirDialogId}
                   onRemarcar={setRemarcarDialogId}
+                  onGerarOS={setGerarOSManutencao}
                 />
               ))}
             </div>
@@ -87,8 +91,8 @@ export default function Manutencoes() {
       id: "calendario",
       label: "Calendário",
       content: (
-        <div className="p-6 text-center text-muted-foreground">
-          Calendário de manutenções (em desenvolvimento)
+        <div className="p-6">
+          <ManutencaoCalendar />
         </div>
       ),
     },
@@ -119,6 +123,12 @@ export default function Manutencoes() {
         open={!!remarcarDialogId}
         onOpenChange={(open) => !open && setRemarcarDialogId(null)}
         manutencaoId={remarcarDialogId}
+      />
+
+      <GerarOSDialog
+        open={!!gerarOSManutencao}
+        onOpenChange={(open) => !open && setGerarOSManutencao(null)}
+        manutencao={gerarOSManutencao}
       />
     </div>
   );
