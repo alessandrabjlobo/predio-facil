@@ -6,14 +6,27 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUsuarios } from "@/hooks/useUsuarios";
 import { useCondominios } from "@/hooks/useCondominios";
-import { Users, UserPlus, Link as LinkIcon, Edit3, Trash2 } from "lucide-react";
+import { Users, UserPlus, Link as LinkIcon, Edit3, Trash2, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 
+type Papel = "admin" | "conselho" | "fornecedor" | "funcionario" | "morador" | "sindico" | "zelador";
+
 export default function AdminUsuarios() {
-  const { usuarios, isLoading, createUsuario, updateUsuario, deleteUsuario, assignRole, linkUsuarioCondominio, unlinkUsuarioCondominio } = useUsuarios();
+  const {
+    usuarios,
+    isLoading,
+    createUsuario,
+    updateUsuario,
+    deleteUsuario,
+    assignRole,
+    removeRole,
+    linkUsuarioCondominio,
+    unlinkUsuarioCondominio,
+  } = useUsuarios();
+
   const { condominios } = useCondominios();
 
   const [search, setSearch] = useState("");
@@ -21,38 +34,45 @@ export default function AdminUsuarios() {
   const [openEditUser, setOpenEditUser] = useState<any>(null);
   const [openRoleDialog, setOpenRoleDialog] = useState<any>(null);
   const [openLinkDialog, setOpenLinkDialog] = useState(false);
+  const [openUnlinkDialog, setOpenUnlinkDialog] = useState<{ usuario_id: string; condominio_id: string } | null>(null);
 
   // Forms
   const [newUserForm, setNewUserForm] = useState({ nome: "", email: "", senha: "", isAdmin: false });
-  const [linkForm, setLinkForm] = useState({ usuario_id: "", condominio_id: "", papel: "morador", is_principal: false });
+  const [linkForm, setLinkForm] = useState<{ usuario_id: string; condominio_id: string; papel: Papel; is_principal: boolean }>({
+    usuario_id: "",
+    condominio_id: "",
+    papel: "morador",
+    is_principal: false,
+  });
 
   const filteredUsers = useMemo(() => {
     if (!search.trim()) return usuarios || [];
     const q = search.toLowerCase();
-    return (usuarios || []).filter((u: any) => 
+    return (usuarios || []).filter((u: any) =>
       (u.nome || "").toLowerCase().includes(q) ||
       (u.email || "").toLowerCase().includes(q)
     );
   }, [usuarios, search]);
 
-async function handleCreateUser(e: React.FormEvent) {
-  e.preventDefault();
-  
-  await createUsuario.mutateAsync({
-    email: newUserForm.email,
-    password: newUserForm.senha,
-    metadata: { nome: newUserForm.nome },
-    globalRole: newUserForm.isAdmin ? "admin" : undefined, // Atribuir role global apenas se for admin
-  });
-  
-  setOpenNewUser(false);
-  setNewUserForm({ nome: "", email: "", senha: "", isAdmin: false });
-}
+  async function handleCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    await createUsuario.mutateAsync({
+      email: newUserForm.email,
+      password: newUserForm.senha,
+      metadata: { nome: newUserForm.nome },
+      globalRole: newUserForm.isAdmin ? "admin" : undefined,
+    });
+    setOpenNewUser(false);
+    setNewUserForm({ nome: "", email: "", senha: "", isAdmin: false });
+  }
 
-
-  async function handleAssignRole(userId: string, role: string) {
+  async function handleAssignRole(userId: string, role: "admin") {
     await assignRole.mutateAsync({ user_id: userId, role });
     setOpenRoleDialog(null);
+  }
+
+  async function handleRemoveRole(userId: string, role: "admin") {
+    await removeRole.mutateAsync({ user_id: userId, role });
   }
 
   async function handleLinkUser(e: React.FormEvent) {
@@ -60,18 +80,24 @@ async function handleCreateUser(e: React.FormEvent) {
     await linkUsuarioCondominio.mutateAsync({
       usuario_id: linkForm.usuario_id,
       condominio_id: linkForm.condominio_id,
-      papel: linkForm.papel as any,
+      papel: linkForm.papel,
       is_principal: linkForm.is_principal,
     });
     setOpenLinkDialog(false);
     setLinkForm({ usuario_id: "", condominio_id: "", papel: "morador", is_principal: false });
   }
 
+  async function handleUnlinkUser() {
+    if (!openUnlinkDialog) return;
+    await unlinkUsuarioCondominio.mutateAsync(openUnlinkDialog);
+    setOpenUnlinkDialog(null);
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
         title="Gestão de Usuários"
-        subtitle="Gerencie usuários, roles globais e vínculos com condomínios"
+        subtitle="Crie, vincule a condomínios e gerencie roles globais (apenas admin)."
         icon={Users}
         actions={
           <Button onClick={() => setOpenNewUser(true)}>
@@ -110,7 +136,7 @@ async function handleCreateUser(e: React.FormEvent) {
                 <tr className="[&>th]:p-3 text-left">
                   <th>Nome</th>
                   <th>Email</th>
-                  <th>Roles Globais</th>
+                  <th>Role Global</th>
                   <th>Condomínios</th>
                   <th className="text-right">Ações</th>
                 </tr>
@@ -126,26 +152,54 @@ async function handleCreateUser(e: React.FormEvent) {
                       <td>{u.nome || "—"}</td>
                       <td>{u.email}</td>
                       <td>
-                        <div className="flex gap-1 flex-wrap">
-                          {(u.user_roles || []).map((r: any, i: number) => (
-                            <Badge key={i} variant="secondary">{r.role}</Badge>
-                          ))}
-                          {(u.user_roles || []).length === 0 && <span className="text-muted-foreground text-xs">—</span>}
+                        <div className="flex gap-2 items-center flex-wrap">
+                          {(u.user_roles || [])
+                            .filter((r: any) => r.role === "admin")
+                            .map((r: any, i: number) => (
+                              <Badge key={i} variant="secondary">{r.role}</Badge>
+                            ))}
+                          {(u.user_roles || []).filter((r: any) => r.role === "admin").length === 0 && (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
                         </div>
                       </td>
                       <td className="text-xs">
                         {(u.usuarios_condominios || []).map((uc: any) => (
-                          <div key={uc.condominio_id}>
-                            {uc.condominios?.nome} ({uc.papel})
+                          <div key={`${uc.condominio_id}-${uc.papel}`} className="flex items-center gap-2">
+                            <span>
+                              {uc.condominios?.nome} ({uc.papel}
+                              {uc.is_principal ? ", principal" : ""})
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="Desvincular"
+                              onClick={() => setOpenUnlinkDialog({ usuario_id: u.id, condominio_id: uc.condominio_id })}
+                            >
+                              <XCircle className="h-4 w-4 text-destructive" />
+                            </Button>
                           </div>
                         ))}
-                        {(u.usuarios_condominios || []).length === 0 && <span className="text-muted-foreground">—</span>}
+                        {(u.usuarios_condominios || []).length === 0 && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button size="sm" variant="outline" onClick={() => setOpenRoleDialog(u)}>
-                            Atribuir Role
-                          </Button>
+                        <div className="flex gap-2 justify-end flex-wrap">
+                          {/* Role Global (apenas admin) */}
+                          {!(u.user_roles || []).some((r: any) => r.role === "admin") ? (
+                            <Button size="sm" variant="outline" onClick={() => setOpenRoleDialog(u)}>
+                              Tornar Admin
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRemoveRole(u.id, "admin")}
+                            >
+                              Remover Admin
+                            </Button>
+                          )}
                           <Button size="sm" variant="outline" onClick={() => setOpenEditUser(u)}>
                             <Edit3 className="h-4 w-4 mr-1" />
                             Editar
@@ -181,7 +235,7 @@ async function handleCreateUser(e: React.FormEvent) {
 
             <div className="border rounded p-4">
               <p className="text-sm text-muted-foreground">
-                Use esta aba para criar vínculos entre usuários e condomínios, definindo papéis (síndico, zelador, morador, etc).
+                Vincule usuários a condomínios e defina papéis (síndico, zelador, morador, etc).
               </p>
             </div>
           </div>
@@ -228,7 +282,7 @@ async function handleCreateUser(e: React.FormEvent) {
                 onCheckedChange={(checked) => setNewUserForm({ ...newUserForm, isAdmin: checked as boolean })}
               />
               <Label htmlFor="isAdmin" className="cursor-pointer">
-                Este usuário é Admin Master
+                Tornar Admin Global
               </Label>
             </div>
             <DialogFooter>
@@ -241,25 +295,18 @@ async function handleCreateUser(e: React.FormEvent) {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: Atribuir Role */}
+      {/* MODAL: Tornar Admin */}
       <Dialog open={!!openRoleDialog} onOpenChange={() => setOpenRoleDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Atribuir Role Global</DialogTitle>
+            <DialogTitle>Tornar Admin Global</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm">Usuário: <strong>{openRoleDialog?.email}</strong></p>
             <div className="flex gap-2 flex-wrap">
-              {["admin", "sindico", "funcionario", "zelador", "fornecedor"].map((role) => (
-                <Button
-                  key={role}
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleAssignRole(openRoleDialog?.id, role)}
-                >
-                  {role}
-                </Button>
-              ))}
+              <Button size="sm" variant="outline" onClick={() => handleAssignRole(openRoleDialog?.id, "admin")}>
+                Conceder Admin
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -314,7 +361,7 @@ async function handleCreateUser(e: React.FormEvent) {
               <Label>Papel</Label>
               <Select
                 value={linkForm.papel}
-                onValueChange={(v) => setLinkForm({ ...linkForm, papel: v })}
+                onValueChange={(v: Papel) => setLinkForm({ ...linkForm, papel: v })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -348,6 +395,26 @@ async function handleCreateUser(e: React.FormEvent) {
               <Button type="submit">Vincular</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL: Desvincular */}
+      <Dialog open={!!openUnlinkDialog} onOpenChange={() => setOpenUnlinkDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover vínculo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm">Confirma remover o vínculo deste usuário com o condomínio?</p>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpenUnlinkDialog(null)}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={handleUnlinkUser}>
+                Remover
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
