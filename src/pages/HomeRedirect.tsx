@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { setCurrentCondominioId } from "@/lib/tenant";
 
 export default function HomeRedirect() {
   const navigate = useNavigate();
@@ -37,19 +38,29 @@ export default function HomeRedirect() {
         return;
       }
 
-      // Verificar papel no condomínio principal
+      // Buscar condomínio principal e papel
       const { data: vinculos } = await supabase
         .from("usuarios_condominios")
-        .select("papel, is_principal")
+        .select("papel, condominio_id, is_principal")
         .eq("usuario_id", perfil.id)
         .order("is_principal", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const papel = vinculos?.papel ?? "morador";
+      if (!vinculos) {
+        // Sem vínculo a condomínio, redireciona para chamados genérico
+        navigate("/chamados");
+        return;
+      }
 
+      // Salvar condomínio atual no localStorage
+      setCurrentCondominioId(vinculos.condominio_id);
+
+      const papel = vinculos.papel ?? "morador";
+
+      // Redirecionar baseado no papel
       if (papel === "sindico" || papel === "admin") {
-        navigate("/dashboard");
+        navigate("/dashboard/sindico");
       } else if (papel === "zelador" || papel === "funcionario") {
         navigate("/manutencoes");
       } else {
