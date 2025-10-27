@@ -18,7 +18,8 @@ export default function RequireOwner({ children }: { children: React.ReactNode }
     );
   }
 
-  if (role !== "owner") {
+  // Allow both "owner" and "admin" to access
+  if (role !== "owner" && role !== "admin") {
     return <Navigate to="/" replace />;
   }
 

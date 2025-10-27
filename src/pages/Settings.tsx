@@ -51,7 +51,6 @@ const Settings = () => {
   if (!authLoading && !condominioLoading && !condominio) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
         <main className="container mx-auto px-4 py-8">
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
@@ -149,7 +148,6 @@ const Settings = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-6">
           <div>

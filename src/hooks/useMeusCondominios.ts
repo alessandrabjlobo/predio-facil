@@ -48,6 +48,13 @@ export const useMeusCondominios = () => {
         .eq("auth_user_id", user.id)
         .single();
 
+      // Primeiro, desmarcar todos como principal
+      await supabase
+        .from("usuarios_condominios")
+        .update({ is_principal: false })
+        .eq("usuario_id", usuario.id);
+
+      // Depois marcar apenas o selecionado (trigger também garantirá isso)
       const { error } = await supabase
         .from("usuarios_condominios")
         .update({ is_principal: true })
