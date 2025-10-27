@@ -24,6 +24,7 @@ export function ConcluirManutencaoDialog({ open, onOpenChange, manutencaoId }: C
     await concluir.mutateAsync({
       id: manutencaoId,
       anexo: anexo || undefined,
+      observacoes: observacoes || undefined,
     });
 
     onOpenChange(false);
@@ -54,7 +55,7 @@ export function ConcluirManutencaoDialog({ open, onOpenChange, manutencaoId }: C
             <Textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Detalhes da execução..."
+              placeholder="Detalhes da execução, problemas encontrados, peças trocadas..."
               rows={4}
             />
           </div>
