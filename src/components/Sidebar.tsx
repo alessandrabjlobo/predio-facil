@@ -11,14 +11,11 @@ import {
   ShieldCheck,
   ClipboardList,
   FileText,
-  ChevronDown,
-  Calendar,
   type LucideIcon,
+  Calendar,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useCondominiosDoUsuario } from "@/hooks/useCondominiosDoUsuario";
-import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 import { Button } from "@/components/ui/button";
 
 type NavItem = { name: string; href: string; icon: LucideIcon };
@@ -28,26 +25,11 @@ interface SidebarProps {
   collapsed: boolean;
 }
 
-const uniqueById = <T extends { condominio_id?: any; id?: any }>(arr: T[]) => {
-  return Array.from(
-    new Map(arr.map((x, i) => [String(x.condominio_id ?? x.id ?? i), x])).values()
-  );
-};
-
 export default function Sidebar({ collapsed }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { role } = useUserRole();
   const [userName, setUserName] = useState<string>("Usuário");
-
-  const { rows, loading } = useCondominiosDoUsuario();
-  const rowsDedupe = useMemo(() => uniqueById(rows || []), [rows]);
-  const ids = useMemo(
-    () => rowsDedupe.map((r) => String(r.condominio_id)),
-    [rowsDedupe]
-  );
-
-  const [current, setCurrent] = useState<string | null>(getCurrentCondominioId());
 
   const navigationGroups: NavGroup[] = useMemo(() => {
     if (role === "owner" || role === "admin") {
@@ -60,7 +42,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
           label: "Gestão",
           items: [
             { name: "Condomínios", href: "/condominios", icon: Building2 },
-            { name: "Usuários", href: "/usuarios", icon: Users },
+            { name: "Usuários", href: "/admin/usuarios", icon: Users },
           ],
         },
         {
@@ -110,7 +92,6 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       ];
     }
 
-
     return [
       { label: "Painel", items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }] }
     ];
@@ -139,43 +120,20 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     })();
   }, []);
 
-  useEffect(() => {
-    if (!loading) {
-      if (!current || (ids.length && !ids.includes(String(current)))) {
-        const fallback = ids[0] ?? null;
-        if (fallback) {
-          setCurrent(fallback);
-          setCurrentCondominioId(fallback);
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, ids.join(","), current]);
-
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/login");
   }
 
-  // Helper para verificar se o link está ativo
   const isActive = (href: string) => {
-    // Remove query params para comparação
     const currentPath = location.pathname;
     const hrefPath = href.split('?')[0];
-    
-    if (href === "/" || href === "/admin") {
-      return currentPath === hrefPath;
-    }
-    
+    if (href === "/" || href === "/admin") return currentPath === hrefPath;
     return currentPath.startsWith(hrefPath);
   };
 
   return (
-    <div
-      className={`${
-        collapsed ? "w-16" : "w-64"
-      } bg-white border-r border-border flex flex-col transition-all duration-300 h-screen sticky top-0`}
-    >
+    <div className={`${collapsed ? "w-16" : "w-64"} bg-white border-r border-border flex flex-col transition-all duration-300 h-screen sticky top-0`}>
       {/* Logo */}
       <div className="h-16 px-6 border-b border-border flex items-center">
         <div className="flex items-center space-x-3">
@@ -194,54 +152,18 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       {/* Navegação */}
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
         {navigationGroups.map((group) => (
-          <Section 
-            key={group.label} 
-            label={group.label} 
-            collapsed={collapsed} 
-            items={group.items}
-            isActive={isActive}
-          />
+          <Section key={group.label} label={group.label} collapsed={collapsed} items={group.items} isActive={isActive} />
         ))}
       </nav>
 
-      {/* Rodapé */}
+      {/* Rodapé - sem seletor de condomínio (evita duplicidade com Header) */}
       <div className="p-4 border-t border-border space-y-3">
-        {/* Seletor de condomínio */}
-        {!collapsed && role !== "owner" && role !== "admin" && (
-          <div className="mb-3">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
-              Condomínio
-            </label>
-            <div className="relative">
-              <select
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground appearance-none pr-8"
-                disabled={loading || rowsDedupe.length === 0}
-                value={current ?? ""}
-                onChange={(e) => {
-                  setCurrent(e.target.value);
-                  setCurrentCondominioId(e.target.value);
-                }}
-              >
-                {rowsDedupe.map((r, idx) => (
-                  <option key={`${r.condominio_id}-${idx}`} value={String(r.condominio_id)}>
-                    {r.condominios?.nome ?? r.condominio_id}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            </div>
-          </div>
-        )}
-
-        {/* Usuário */}
         {!collapsed && (
           <div className="mb-3">
             <p className="text-sm font-medium text-foreground">{userName}</p>
             <p className="text-xs text-muted-foreground capitalize">{role}</p>
           </div>
         )}
-
-        {/* Sair */}
         <Button
           variant="ghost"
           className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} text-destructive hover:text-destructive hover:bg-destructive/10`}
@@ -280,12 +202,8 @@ function Section({
           <NavLink
             key={item.href}
             to={item.href}
-            className={`flex items-center ${
-              collapsed ? "justify-center" : "space-x-3"
-            } px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isActive(item.href)
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            className={`flex items-center ${collapsed ? "justify-center" : "space-x-3"} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isActive(item.href) ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
             title={collapsed ? item.name : undefined}
           >
