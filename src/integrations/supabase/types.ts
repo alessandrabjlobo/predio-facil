@@ -973,6 +973,109 @@ export type Database = {
           },
         ]
       }
+      ordens_servico: {
+        Row: {
+          anexos: Json | null
+          ativo_id: string | null
+          condominio_id: string
+          created_at: string
+          data_abertura: string
+          data_conclusao: string | null
+          descricao: string | null
+          fornecedor_id: string | null
+          id: string
+          manutencao_id: string | null
+          prioridade: string
+          responsavel_id: string | null
+          status: string
+          titulo: string
+          updated_at: string
+          valor_final: number | null
+          valor_orcado: number | null
+        }
+        Insert: {
+          anexos?: Json | null
+          ativo_id?: string | null
+          condominio_id: string
+          created_at?: string
+          data_abertura?: string
+          data_conclusao?: string | null
+          descricao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          manutencao_id?: string | null
+          prioridade?: string
+          responsavel_id?: string | null
+          status?: string
+          titulo: string
+          updated_at?: string
+          valor_final?: number | null
+          valor_orcado?: number | null
+        }
+        Update: {
+          anexos?: Json | null
+          ativo_id?: string | null
+          condominio_id?: string
+          created_at?: string
+          data_abertura?: string
+          data_conclusao?: string | null
+          descricao?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          manutencao_id?: string | null
+          prioridade?: string
+          responsavel_id?: string | null
+          status?: string
+          titulo?: string
+          updated_at?: string
+          valor_final?: number | null
+          valor_orcado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_servico_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativo_historico_manutencao"
+            referencedColumns: ["ativo_id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_ativo_id_fkey"
+            columns: ["ativo_id"]
+            isOneToOne: false
+            referencedRelation: "ativos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_manutencao_id_fkey"
+            columns: ["manutencao_id"]
+            isOneToOne: false
+            referencedRelation: "ativo_historico_manutencao"
+            referencedColumns: ["manutencao_id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_manutencao_id_fkey"
+            columns: ["manutencao_id"]
+            isOneToOne: false
+            referencedRelation: "manutencoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_responsavel_id_fkey"
+            columns: ["responsavel_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       os: {
         Row: {
           aceite_em: string | null

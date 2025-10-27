@@ -37,7 +37,7 @@ export function GerarOSDialog({ open, onOpenChange, manutencao }: GerarOSDialogP
 
       // Criar OS
       const { data: os, error } = await supabase
-        .from("ordens_servico")
+        .from("ordens_servico" as any)
         .insert({
           titulo,
           descricao,
@@ -54,7 +54,7 @@ export function GerarOSDialog({ open, onOpenChange, manutencao }: GerarOSDialogP
 
       toast({ title: "OS criada com sucesso!" });
       onOpenChange(false);
-      navigate(`/os?id=${os.id}`);
+      navigate(`/os?id=${(os as any).id}`);
     } catch (error: any) {
       toast({
         title: "Erro ao criar OS",
