@@ -62,9 +62,11 @@ export default function RequireRole({
 
           const papelAtual = rel?.papel as Papel | undefined;
           if (papelAtual && allowed.includes(papelAtual)) {
-            if (mounted) setTemAcesso(true);
-            setLoading(false);
-            return;
+            if (mounted) {
+              setTemAcesso(true);
+              setLoading(false);
+            }
+            return; // ✅ CRITICAL: Return immediately to prevent redirect loop
           }
         }
 

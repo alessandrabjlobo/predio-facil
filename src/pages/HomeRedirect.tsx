@@ -55,6 +55,7 @@ export default function HomeRedirect() {
 
       // Salvar condomínio atual no localStorage
       setCurrentCondominioId(vinculos.condominio_id);
+      console.log("🔍 HomeRedirect: Condomínio salvo:", vinculos.condominio_id, "Papel:", vinculos.papel);
 
       const papel = vinculos.papel ?? "morador";
 
