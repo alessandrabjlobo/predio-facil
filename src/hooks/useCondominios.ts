@@ -17,6 +17,7 @@ export const useCondominios = () => {
           cnpj,
           cidade,
           uf,
+          unidades,
           created_at,
           usuarios_condominios(
             usuario_id,

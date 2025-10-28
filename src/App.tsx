@@ -121,6 +121,14 @@ export default function App() {
                     </RequireOwner>
                   }
                 />
+                <Route
+                  path="admin/condominios"
+                  element={
+                    <RequireOwner>
+                      <Condominios />
+                    </RequireOwner>
+                  }
+                />
 
                 {/* Dashboard do síndico */}
                 <Route

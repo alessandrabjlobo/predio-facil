@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,27 @@ export function MaintenanceTemplateDialog({ open, onOpenChange, template, onSucc
     sistema: template?.sistema || "",
     titulo_plano: template?.titulo_plano || "",
     descricao: template?.descricao || "",
+    evidencia: template?.evidencia || "",
     periodicidade_dias: template?.periodicidade ? parseInt(template.periodicidade.match(/\d+/)?.[0] || "30") : 30,
     responsavel: template?.responsavel || "sindico",
     is_conformidade: template?.is_conformidade || false,
     checklist: template?.checklist || "[]",
   });
+
+  // Sync when opening or when a different template is selected
+  // Ensures "Editar" modal is prefilled correctly
+  if (open && template && (formData.titulo_plano !== (template?.titulo_plano || ""))) {
+    setFormData({
+      sistema: template?.sistema || "",
+      titulo_plano: template?.titulo_plano || "",
+      descricao: template?.descricao || "",
+      evidencia: template?.evidencia || "",
+      periodicidade_dias: template?.periodicidade ? parseInt(template.periodicidade.match(/\d+/)?.[0] || "30") : 30,
+      responsavel: template?.responsavel || "sindico",
+      is_conformidade: template?.is_conformidade || false,
+      checklist: template?.checklist || "[]",
+    });
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +125,15 @@ export function MaintenanceTemplateDialog({ open, onOpenChange, template, onSucc
                 onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                 placeholder="Detalhes sobre este template"
                 rows={3}
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>Evidências Requeridas</Label>
+              <Textarea
+                value={formData.evidencia}
+                onChange={(e) => setFormData({ ...formData, evidencia: e.target.value })}
+                placeholder="Ex: Fotos, ART, Relatório técnico"
+                rows={2}
               />
             </div>
             <div>

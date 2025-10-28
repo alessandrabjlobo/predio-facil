@@ -23,17 +23,39 @@ export function AssetTypeDialog({ open, onOpenChange, assetType, onSuccess }: As
     sistema_manutencao: assetType?.sistema_manutencao || "",
     criticidade: assetType?.criticidade || "media",
     is_conformidade: assetType?.is_conformidade || false,
+    checklist_default: assetType?.checklist_default ? JSON.stringify(assetType.checklist_default, null, 2) : "[]",
   });
+
+  // Keep form in sync when editing
+  if (open && assetType && (formData.slug !== (assetType?.slug || ""))) {
+    setFormData({
+      nome: assetType?.nome || "",
+      slug: assetType?.slug || "",
+      sistema_manutencao: assetType?.sistema_manutencao || "",
+      criticidade: assetType?.criticidade || "media",
+      is_conformidade: assetType?.is_conformidade || false,
+      checklist_default: assetType?.checklist_default ? JSON.stringify(assetType.checklist_default, null, 2) : "[]",
+    });
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      const payload = {
+        nome: formData.nome,
+        slug: formData.slug,
+        sistema_manutencao: formData.sistema_manutencao,
+        criticidade: formData.criticidade,
+        is_conformidade: formData.is_conformidade,
+        checklist_default: typeof formData.checklist_default === 'string' ? JSON.parse(formData.checklist_default) : formData.checklist_default,
+      } as any;
+
       if (assetType) {
         const { error } = await supabase
           .from("ativo_tipos")
-          .update(formData)
+          .update(payload)
           .eq("id", assetType.id);
 
         if (error) throw error;
@@ -41,7 +63,7 @@ export function AssetTypeDialog({ open, onOpenChange, assetType, onSuccess }: As
       } else {
         const { error } = await supabase
           .from("ativo_tipos")
-          .insert(formData);
+          .insert(payload);
 
         if (error) throw error;
         toast.success("Tipo de ativo criado com sucesso!");
@@ -123,6 +145,16 @@ export function AssetTypeDialog({ open, onOpenChange, assetType, onSuccess }: As
                   <SelectItem value="false">Não</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="col-span-2">
+              <Label>Checklist Padrão (JSON)</Label>
+              <Textarea
+                value={typeof formData.checklist_default === 'string' ? formData.checklist_default : JSON.stringify(formData.checklist_default, null, 2)}
+                onChange={(e) => setFormData({ ...formData, checklist_default: e.target.value })}
+                placeholder='[{"descricao": "Verificar cabos", "obrigatorio": true}]'
+                rows={6}
+                className="font-mono text-xs"
+              />
             </div>
           </div>
           <DialogFooter>

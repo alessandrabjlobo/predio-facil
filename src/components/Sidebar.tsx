@@ -51,8 +51,20 @@ export default function Sidebar({ collapsed }: SidebarProps) {
 
   const isActive = (href: string) => {
     const currentPath = location.pathname;
-    const hrefPath = href.split('?')[0];
-    if (href === "/" || href === "/admin") return currentPath === hrefPath;
+    const currentSearch = new URLSearchParams(location.search);
+    const [hrefPath, hrefQuery] = href.split('?');
+
+    // Exact match for root and admin
+    if (hrefPath === "/" || hrefPath === "/admin") return currentPath === hrefPath;
+
+    // If link uses tab param, require both path and tab to match
+    if (hrefQuery && hrefQuery.includes('tab=')) {
+      const params = new URLSearchParams(hrefQuery);
+      const tab = params.get('tab');
+      return currentPath === hrefPath && currentSearch.get('tab') === tab;
+    }
+
+    // Default: startsWith for nested routes
     return currentPath.startsWith(hrefPath);
   };
 

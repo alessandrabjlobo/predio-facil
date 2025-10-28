@@ -27,7 +27,7 @@ export function AdminSidebar({ collapsed, isActive }: AdminSidebarProps) {
     {
       label: "Gestão",
       items: [
-        { name: "Condomínios", href: "/condominios", icon: Building2 },
+        { name: "Condomínios", href: "/admin/condominios", icon: Building2 },
         { name: "Usuários", href: "/admin/usuarios", icon: Users },
       ],
     },
