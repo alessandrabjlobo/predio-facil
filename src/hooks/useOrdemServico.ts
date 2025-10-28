@@ -7,11 +7,14 @@ export const useOrdemServico = () => {
   const { condominio } = useCondominioAtual();
   const queryClient = useQueryClient();
 
+  /**
+   * 🧾 BUSCA LISTA DE ORDENS DE SERVIÇO
+   */
   const { data: ordens, isLoading } = useQuery({
     queryKey: ["ordens-servico", condominio?.id],
     queryFn: async () => {
       if (!condominio?.id) return [];
-      
+
       const { data, error } = await supabase
         .from("os")
         .select(`
@@ -45,6 +48,9 @@ export const useOrdemServico = () => {
     enabled: !!condominio?.id,
   });
 
+  /**
+   * 🧱 CRIAÇÃO DE ORDEM DE SERVIÇO (via RPC criar_os)
+   */
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
@@ -67,7 +73,7 @@ export const useOrdemServico = () => {
     }) => {
       if (!condominio?.id) throw new Error("Condomínio não encontrado");
 
-      // Buscar usuário atual
+      // Buscar usuário autenticado (solicitante)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -79,40 +85,40 @@ export const useOrdemServico = () => {
 
       if (!usuario) throw new Error("Usuário não encontrado");
 
-      // Gerar número da OS
-      const { data: numero, error: numeroError } = await supabase
-        .rpc("generate_os_numero", { p_condominio_id: condominio.id });
+      // Log de depuração para o Supabase
+      console.log("📦 Enviando RPC criar_os", {
+        condominio_id: condominio.id,
+        plano_id: planoId,
+        ativo_id: ativoId,
+        responsavel_id: usuario.id,
+        titulo,
+        descricao,
+        tipo,
+        prioridade,
+        dataPrevista,
+      });
 
-      if (numeroError) throw numeroError;
+      // 🚀 Chamada RPC corrigida
+      const { data, error } = await supabase.rpc("criar_os", {
+        p_condominio_id: condominio.id,
+        p_plano_id: planoId || null,
+        p_ativo_id: ativoId,
+        p_responsavel_id: usuario.id,
+        p_titulo: titulo,
+        p_descricao: descricao || "",
+        p_prioridade: prioridade,
+        p_tipo_os: tipo,
+        p_data_prevista: dataPrevista || null,
+      });
 
-      const dataAbertura = new Date();
-      const slaVencimento = dataPrevista 
-        ? new Date(dataPrevista)
-        : new Date(dataAbertura.getTime() + slaDias * 24 * 60 * 60 * 1000);
+      if (error) {
+        console.error("❌ Erro Supabase RPC criar_os:", error);
+        throw new Error(error.message || "Erro desconhecido ao criar OS");
+      }
 
-      const { data, error } = await supabase
-        .from("os")
-        .insert({
-          condominio_id: condominio.id,
-          numero,
-          titulo,
-          descricao,
-          status: "aberta",
-          origem: tipo,
-          prioridade,
-          ativo_id: ativoId,
-          plano_id: planoId,
-          solicitante_id: usuario.id,
-          data_abertura: dataAbertura.toISOString(),
-          data_prevista: dataPrevista,
-          sla_vencimento: slaVencimento.toISOString().split('T')[0],
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
       return data;
     },
+
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ordens-servico"] });
       toast({
@@ -120,7 +126,9 @@ export const useOrdemServico = () => {
         description: "Ordem de Serviço criada com sucesso!",
       });
     },
+
     onError: (error) => {
+      console.error("❌ Erro ao criar OS:", error);
       toast({
         title: "Erro",
         description: `Erro ao criar OS: ${error.message}`,
@@ -129,6 +137,9 @@ export const useOrdemServico = () => {
     },
   });
 
+  /**
+   * 🔄 ATUALIZA STATUS DA ORDEM
+   */
   const updateOSStatus = useMutation({
     mutationFn: async ({
       osId,
@@ -175,6 +186,9 @@ export const useOrdemServico = () => {
     },
   });
 
+  /**
+   * 👷‍♂️ ATRIBUI EXECUTOR À OS
+   */
   const assignExecutor = useMutation({
     mutationFn: async ({
       osId,
@@ -215,6 +229,9 @@ export const useOrdemServico = () => {
     },
   });
 
+  /**
+   * ✅ VALIDAÇÃO DE OS (síndico aprova ou reprova)
+   */
   const validateOS = useMutation({
     mutationFn: async ({
       osId,
@@ -242,6 +259,7 @@ export const useOrdemServico = () => {
           status: aprovado ? "concluida" : "aguardando_validacao",
           validado_por: usuario.id,
           validado_em: new Date().toISOString(),
+          observacoes_validacao: observacoes || null,
         })
         .eq("id", osId)
         .select()
@@ -267,6 +285,9 @@ export const useOrdemServico = () => {
     },
   });
 
+  /**
+   * 🔁 EXPORTAÇÃO
+   */
   return {
     ordens,
     isLoading,
