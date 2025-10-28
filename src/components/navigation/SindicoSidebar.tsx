@@ -23,27 +23,24 @@ export function SindicoSidebar({ collapsed, isActive }: SindicoSidebarProps) {
   const navigationGroups: NavGroup[] = [
     {
       label: "Painel",
-      items: [{ name: "Dashboard", href: "/dashboard/sindico", icon: LayoutDashboard }],
+      items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }],
     },
     {
-      label: "Manutenção",
+      label: "Manutenção Predial",
       items: [
-        { name: "Ativos do Condomínio", href: "/manutencao-predial?tab=ativos", icon: Package },
+        { name: "Ativos", href: "/manutencao-predial?tab=ativos", icon: Package },
         { name: "Planos Preventivos", href: "/manutencao-predial?tab=planos", icon: Wrench },
         { name: "Ordens de Serviço", href: "/manutencao-predial?tab=os", icon: ClipboardList },
         { name: "Agenda", href: "/manutencao-predial?tab=agenda", icon: Calendar },
-      ],
-    },
-    {
-      label: "Relatórios",
-      items: [
         { name: "Conformidade", href: "/manutencao-predial?tab=relatorios", icon: ShieldCheck },
-        { name: "Relatórios Gerais", href: "/relatorios", icon: FileText },
       ],
     },
     {
       label: "Sistema",
-      items: [{ name: "Configurações", href: "/configuracoes", icon: Settings }],
+      items: [
+        { name: "Relatórios", href: "/relatorios", icon: FileText },
+        { name: "Configurações", href: "/configuracoes", icon: Settings },
+      ],
     },
   ];
 

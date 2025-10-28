@@ -15,7 +15,22 @@ export const useOrdemServico = () => {
       const { data, error } = await supabase
         .from("os")
         .select(`
-          *,
+          id,
+          numero,
+          titulo,
+          descricao,
+          status,
+          status_validacao,
+          origem,
+          prioridade,
+          data_abertura,
+          data_prevista,
+          data_conclusao,
+          custo_previsto,
+          custo_aprovado,
+          custo_final,
+          executor_nome,
+          executor_contato,
           ativo:ativos(id, nome, tipo_id),
           plano:planos_manutencao(id, titulo, tipo, checklist),
           solicitante:usuarios!os_solicitante_id_fkey(id, nome),

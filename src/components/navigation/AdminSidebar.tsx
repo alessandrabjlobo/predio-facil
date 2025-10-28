@@ -27,15 +27,15 @@ export function AdminSidebar({ collapsed, isActive }: AdminSidebarProps) {
     {
       label: "Gestão",
       items: [
-        { name: "Condomínios", href: "/condominios", icon: Building2 },
+        { name: "Condomínios", href: "/condominios-cadastro", icon: Building2 },
         { name: "Usuários", href: "/admin/usuarios", icon: Users },
       ],
     },
     {
       label: "Biblioteca Global",
       items: [
-        { name: "Ativos", href: "/admin/asset-library", icon: Package },
-        { name: "Templates de Manutenção", href: "/admin/maintenance-templates", icon: Wrench },
+        { name: "Tipos de Ativos", href: "/admin/asset-library", icon: Package },
+        { name: "Templates NBR", href: "/admin/maintenance-templates", icon: Wrench },
       ],
     },
     {
