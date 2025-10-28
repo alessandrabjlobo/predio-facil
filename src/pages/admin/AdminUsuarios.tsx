@@ -435,7 +435,7 @@ export default function AdminUsuarios() {
                 onValueChange={(v) => setLinkForm({ ...linkForm, condominio_id: v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue placeholder="Selecione um condomínio..." />
                 </SelectTrigger>
                 <SelectContent>
                   {(condominios || []).map((c: any) => (

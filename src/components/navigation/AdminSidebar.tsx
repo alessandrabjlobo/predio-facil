@@ -27,7 +27,7 @@ export function AdminSidebar({ collapsed, isActive }: AdminSidebarProps) {
     {
       label: "Gestão",
       items: [
-        { name: "Condomínios", href: "/condominios-cadastro", icon: Building2 },
+        { name: "Condomínios", href: "/condominios", icon: Building2 },
         { name: "Usuários", href: "/admin/usuarios", icon: Users },
       ],
     },
@@ -42,7 +42,7 @@ export function AdminSidebar({ collapsed, isActive }: AdminSidebarProps) {
       label: "Sistema",
       items: [
         { name: "Relatórios", href: "/relatorios", icon: FileText },
-        { name: "Configurações", href: "/configuracoes", icon: Settings },
+        { name: "Configurações", href: "/config", icon: Settings },
       ],
     },
   ];

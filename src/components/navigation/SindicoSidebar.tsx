@@ -39,7 +39,7 @@ export function SindicoSidebar({ collapsed, isActive }: SindicoSidebarProps) {
       label: "Sistema",
       items: [
         { name: "Relatórios", href: "/relatorios", icon: FileText },
-        { name: "Configurações", href: "/configuracoes", icon: Settings },
+        { name: "Configurações", href: "/config", icon: Settings },
       ],
     },
   ];

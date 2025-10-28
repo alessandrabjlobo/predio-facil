@@ -125,9 +125,9 @@ const Admin = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {condominios?.reduce((acc, cond) => {
-                        const sindicoCount = Array.isArray(cond.usuarios_condominios)
-                          ? cond.usuarios_condominios.filter((uc: any) => uc.papel === "sindico").length
+                      {condominios?.reduce((acc: number, cond: any) => {
+                        const sindicoCount = Array.isArray(cond?.usuarios_condominios)
+                          ? cond.usuarios_condominios.filter((uc: any) => uc?.papel === "sindico").length
                           : 0;
                         return acc + sindicoCount;
                       }, 0) || 0}

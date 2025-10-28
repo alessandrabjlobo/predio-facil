@@ -13,15 +13,16 @@ export const useDashboardStats = () => {
       const [chamadosRes, ativosRes, conformidadesRes] = await Promise.all([
         supabase
           .from("chamados")
-          .select("id, prioridade, status")
+          .select("id, prioridade, status", { count: "exact" })
           .eq("condominio_id", condominio.id),
         supabase
           .from("ativos")
-          .select("id")
-          .eq("condominio_id", condominio.id),
+          .select("id", { count: "exact" })
+          .eq("condominio_id", condominio.id)
+          .eq("is_ativo", true),
         supabase
           .from("conformidade_itens")
-          .select("id, status")
+          .select("id, status", { count: "exact" })
           .eq("condominio_id", condominio.id),
       ]);
 
@@ -40,5 +41,6 @@ export const useDashboardStats = () => {
       };
     },
     enabled: !!condominio?.id,
+    staleTime: 30000, // 30 seconds cache
   });
 };

@@ -28,7 +28,11 @@ export const useAuth = () => {
   }, []);
 
   const signOut = async () => {
+    setLoading(true);
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    setLoading(false);
   };
 
   return { user, session, loading, signOut };

@@ -33,6 +33,7 @@ import Agenda from "@/pages/agenda";
 import ManutencaoPredial from "@/pages/ManutencaoPredial";
 import MaintenanceTemplates from "@/pages/admin/MaintenanceTemplates";
 import AssetLibrary from "@/pages/admin/AssetLibrary";
+import Condominios from "@/pages/Condominios";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -111,6 +112,14 @@ export default function App() {
                     </RequireOwner>
                   }
                 />
+                <Route
+                  path="condominios"
+                  element={
+                    <RequireOwner>
+                      <Condominios />
+                    </RequireOwner>
+                  }
+                />
 
                 {/* Dashboard do síndico */}
                 <Route
@@ -134,6 +143,7 @@ export default function App() {
                 <Route path="manutencao-predial" element={<ManutencaoPredial />} />
                 <Route path="relatorios" element={<Relatorios />} />
                 <Route path="config" element={<Configuracoes />} />
+                <Route path="configuracoes" element={<Configuracoes />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/login" replace />} />

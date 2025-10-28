@@ -11,7 +11,13 @@ export const useCondominios = () => {
       const { data, error } = await supabase
         .from("condominios")
         .select(`
-          *,
+          id,
+          nome,
+          endereco,
+          cnpj,
+          cidade,
+          uf,
+          created_at,
           usuarios_condominios(
             usuario_id,
             papel,
@@ -23,6 +29,7 @@ export const useCondominios = () => {
       if (error) throw error;
       return data || [];
     },
+    staleTime: 60000, // 1 minute cache
   });
 
   const createCondominio = useMutation({
