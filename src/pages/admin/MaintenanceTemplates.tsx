@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useManutTemplates } from "@/hooks/useManutTemplates";
+import { MaintenanceTemplateDialog } from "@/components/admin/MaintenanceTemplateDialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -15,7 +18,32 @@ import {
 } from "@/components/ui/table";
 
 export default function MaintenanceTemplates() {
-  const { templates, isLoading } = useManutTemplates();
+  const { templates, isLoading, refetch } = useManutTemplates();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+
+  const handleEdit = (template: any) => {
+    setSelectedTemplate(template);
+    setDialogOpen(true);
+  };
+
+  const handleNew = () => {
+    setSelectedTemplate(null);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string, titulo: string) => {
+    if (!window.confirm(`Excluir template "${titulo}"? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      const { error } = await supabase.from("manut_templates").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Template excluído com sucesso!");
+      refetch();
+    } catch (error: any) {
+      toast.error(`Erro ao excluir: ${error.message}`);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -39,7 +67,7 @@ export default function MaintenanceTemplates() {
         subtitle="Biblioteca global de templates baseados em NBR 5674 e normas relacionadas"
         icon={Wrench}
         actions={
-          <Button>
+          <Button onClick={handleNew}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Template
           </Button>
@@ -96,10 +124,10 @@ export default function MaintenanceTemplates() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(template)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(template.id, template.titulo_plano)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -117,6 +145,16 @@ export default function MaintenanceTemplates() {
           </Table>
         </CardContent>
       </Card>
+
+      <MaintenanceTemplateDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        template={selectedTemplate}
+        onSuccess={() => {
+          refetch();
+          setDialogOpen(false);
+        }}
+      />
     </div>
   );
 }

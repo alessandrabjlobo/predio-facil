@@ -34,6 +34,7 @@ import ManutencaoPredial from "@/pages/ManutencaoPredial";
 import MaintenanceTemplates from "@/pages/admin/MaintenanceTemplates";
 import AssetLibrary from "@/pages/admin/AssetLibrary";
 import Condominios from "@/pages/Condominios";
+import ConfiguracoesSindico from "@/pages/ConfiguracoesSindico";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,8 +143,22 @@ export default function App() {
                 <Route path="agenda" element={<Agenda />} />
                 <Route path="manutencao-predial" element={<ManutencaoPredial />} />
                 <Route path="relatorios" element={<Relatorios />} />
-                <Route path="config" element={<Configuracoes />} />
-                <Route path="configuracoes" element={<Configuracoes />} />
+                <Route 
+                  path="config" 
+                  element={
+                    <RequireOwner>
+                      <Configuracoes />
+                    </RequireOwner>
+                  } 
+                />
+                <Route 
+                  path="configuracoes" 
+                  element={
+                    <RequireRole allowed={["sindico", "admin"]}>
+                      <ConfiguracoesSindico />
+                    </RequireRole>
+                  } 
+                />
               </Route>
 
               <Route path="*" element={<Navigate to="/login" replace />} />

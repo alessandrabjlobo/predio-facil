@@ -26,9 +26,14 @@ export function SindicoSidebar({ collapsed, isActive }: SindicoSidebarProps) {
       items: [{ name: "Dashboard", href: "/", icon: LayoutDashboard }],
     },
     {
-      label: "Manutenção Predial",
+      label: "Gestão de Ativos",
       items: [
         { name: "Ativos", href: "/manutencao-predial?tab=ativos", icon: Package },
+      ],
+    },
+    {
+      label: "Manutenção Predial",
+      items: [
         { name: "Planos Preventivos", href: "/manutencao-predial?tab=planos", icon: Wrench },
         { name: "Ordens de Serviço", href: "/manutencao-predial?tab=os", icon: ClipboardList },
         { name: "Agenda", href: "/manutencao-predial?tab=agenda", icon: Calendar },
@@ -39,7 +44,7 @@ export function SindicoSidebar({ collapsed, isActive }: SindicoSidebarProps) {
       label: "Sistema",
       items: [
         { name: "Relatórios", href: "/relatorios", icon: FileText },
-        { name: "Configurações", href: "/config", icon: Settings },
+        { name: "Configurações", href: "/configuracoes", icon: Settings },
       ],
     },
   ];

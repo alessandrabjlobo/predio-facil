@@ -438,22 +438,34 @@ export type Database = {
       }
       condominios: {
         Row: {
+          cidade: string | null
+          cnpj: string | null
           created_at: string | null
           endereco: string | null
           id: string
           nome: string
+          uf: string | null
+          unidades: number | null
         }
         Insert: {
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string | null
           endereco?: string | null
           id?: string
           nome: string
+          uf?: string | null
+          unidades?: number | null
         }
         Update: {
+          cidade?: string | null
+          cnpj?: string | null
           created_at?: string | null
           endereco?: string | null
           id?: string
           nome?: string
+          uf?: string | null
+          unidades?: number | null
         }
         Relationships: []
       }
@@ -1915,6 +1927,13 @@ export type Database = {
         Returns: undefined
       }
       generate_os_numero: { Args: { p_condominio_id: string }; Returns: string }
+      get_asset_maintenance_info: {
+        Args: { p_ativo_id: string }
+        Returns: {
+          checklist_items: Json
+          maintenance_history: Json
+        }[]
+      }
       get_maintenance_stats: {
         Args: { p_condominio_id: string }
         Returns: {

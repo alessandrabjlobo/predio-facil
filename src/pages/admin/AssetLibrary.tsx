@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { PageHeader } from "@/components/patterns/PageHeader";
-import { Package, Plus } from "lucide-react";
+import { Package, Plus, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAtivoTipos } from "@/hooks/useAtivoTipos";
+import { AssetTypeDialog } from "@/components/admin/AssetTypeDialog";
 import {
   Table,
   TableBody,
@@ -12,9 +14,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function AssetLibrary() {
-  const { tipos: tiposAtivos, isLoading } = useAtivoTipos();
+  const { tipos: tiposAtivos, isLoading, refetch } = useAtivoTipos();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState<any>(null);
+
+  const handleEdit = (tipo: any) => {
+    setSelectedType(tipo);
+    setDialogOpen(true);
+  };
+
+  const handleNew = () => {
+    setSelectedType(null);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string, nome: string) => {
+    if (!window.confirm(`Excluir tipo de ativo "${nome}"? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      const { error } = await supabase.from("ativo_tipos").delete().eq("id", id);
+      if (error) throw error;
+      toast.success("Tipo de ativo excluído com sucesso!");
+      refetch();
+    } catch (error: any) {
+      toast.error(`Erro ao excluir: ${error.message}`);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -38,7 +67,7 @@ export default function AssetLibrary() {
         subtitle="Catálogo de tipos de ativos disponíveis para todos os condomínios"
         icon={Package}
         actions={
-          <Button>
+          <Button onClick={handleNew}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Tipo de Ativo
           </Button>
@@ -101,9 +130,14 @@ export default function AssetLibrary() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="sm">
-                        Editar
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(tipo)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(tipo.id, tipo.nome)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -118,6 +152,16 @@ export default function AssetLibrary() {
           </Table>
         </CardContent>
       </Card>
+
+      <AssetTypeDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        assetType={selectedType}
+        onSuccess={() => {
+          refetch();
+          setDialogOpen(false);
+        }}
+      />
     </div>
   );
 }

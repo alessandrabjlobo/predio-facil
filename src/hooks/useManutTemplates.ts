@@ -106,6 +106,8 @@ export const useManutTemplates = () => {
     },
   });
 
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ["manut-templates"] });
+
   return {
     templates,
     tiposAtivos,
@@ -113,5 +115,6 @@ export const useManutTemplates = () => {
     isLoading: isLoading || isLoadingTipos || isLoadingDocs,
     getTemplateDocumentos,
     updateTemplateDocumentos,
+    refetch,
   };
 };
