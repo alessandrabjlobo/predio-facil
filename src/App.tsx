@@ -1,3 +1,5 @@
+console.log("♻️ Build recompilado em 2025-10-28 — força de deploy Lovable ativa");
+
 import { Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
