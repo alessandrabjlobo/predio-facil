@@ -31,6 +31,8 @@ import Manutencoes from "@/pages/Manutencoes";
 import AdminUsuarios from "@/pages/admin/AdminUsuarios";
 import Agenda from "@/pages/agenda";
 import ManutencaoPredial from "@/pages/ManutencaoPredial";
+import MaintenanceTemplates from "@/pages/admin/MaintenanceTemplates";
+import AssetLibrary from "@/pages/admin/AssetLibrary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -90,6 +92,22 @@ export default function App() {
                   element={
                     <RequireOwner>
                       <AdminUsuarios />
+                    </RequireOwner>
+                  }
+                />
+                <Route
+                  path="admin/maintenance-templates"
+                  element={
+                    <RequireOwner>
+                      <MaintenanceTemplates />
+                    </RequireOwner>
+                  }
+                />
+                <Route
+                  path="admin/asset-library"
+                  element={
+                    <RequireOwner>
+                      <AssetLibrary />
                     </RequireOwner>
                   }
                 />

@@ -1,0 +1,122 @@
+import { useState } from "react";
+import { PageHeader } from "@/components/patterns/PageHeader";
+import { Wrench, Plus, Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useManutTemplates } from "@/hooks/useManutTemplates";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+
+export default function MaintenanceTemplates() {
+  const { templates, isLoading } = useManutTemplates();
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <PageHeader
+          title="Templates de Manutenção"
+          subtitle="Biblioteca global de templates NBR"
+          icon={Wrench}
+        />
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Carregando templates...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <PageHeader
+        title="Templates de Manutenção"
+        subtitle="Biblioteca global de templates baseados em NBR 5674 e normas relacionadas"
+        icon={Wrench}
+        actions={
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Template
+          </Button>
+        }
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Templates Cadastrados</CardTitle>
+          <CardDescription>
+            Gerencie os templates de manutenção que serão aplicados automaticamente aos ativos
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sistema</TableHead>
+                <TableHead>Título do Plano</TableHead>
+                <TableHead>Periodicidade</TableHead>
+                <TableHead>Responsável</TableHead>
+                <TableHead>Conformidade</TableHead>
+                <TableHead>Checklist</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {templates && templates.length > 0 ? (
+                templates.map((template) => (
+                  <TableRow key={template.id}>
+                    <TableCell className="font-medium">{template.sistema}</TableCell>
+                    <TableCell>{template.titulo_plano}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {String(template.periodicidade)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="capitalize">{template.responsavel || "N/A"}</TableCell>
+                    <TableCell>
+                      {template.is_conformidade ? (
+                        <Badge variant="default">Obrigatório</Badge>
+                      ) : (
+                        <Badge variant="secondary">Opcional</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {template.checklist && Array.isArray(template.checklist) ? (
+                        <span className="text-sm text-muted-foreground">
+                          {template.checklist.length} itens
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Nenhum template cadastrado
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

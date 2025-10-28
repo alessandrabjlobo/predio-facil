@@ -59,6 +59,7 @@ export function CreateOSDialog({
   const [dataPrevista, setDataPrevista] = useState<Date>();
   const [nbrRequisitos, setNbrRequisitos] = useState<any[]>([]);
   const [checklistItems, setChecklistItems] = useState<any[]>([]);
+  const [editableChecklist, setEditableChecklist] = useState<boolean>(true);
 
   // Load NBR requirements and checklist when ativo changes
   useEffect(() => {
@@ -125,8 +126,8 @@ export function CreateOSDialog({
 
       if (data && data[0]?.success) {
         toast({
-          title: "OS Criada com Sucesso!",
-          description: `Ordem de Serviço ${data[0].os_numero} foi criada.`,
+          title: "✅ OS Criada com Sucesso!",
+          description: data[0].message || `Ordem de Serviço ${data[0].os_numero} criada - Checklist NBR vinculado e salvo`,
         });
         onOpenChange(false);
         onSuccess?.();
@@ -321,23 +322,56 @@ export function CreateOSDialog({
             </div>
           </div>
 
-          {/* Checklist Preview */}
+          {/* Editable NBR Checklist */}
           {checklistItems && checklistItems.length > 0 && (
             <>
               <Separator />
               <div className="space-y-3">
-                <Label className="flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4" />
-                  Checklist de Execução ({checklistItems.length} itens)
-                </Label>
-                <div className="bg-muted/30 p-4 rounded-lg space-y-2 max-h-40 overflow-y-auto">
-                  {checklistItems.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 text-sm">
-                      <CheckSquare className="h-3 w-3 mt-0.5 text-muted-foreground" />
-                      <span>{typeof item === 'string' ? item : item.descricao || item.item}</span>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4" />
+                    Checklist NBR de Execução ({checklistItems.length} itens)
+                  </Label>
+                  <Badge variant="outline" className="text-xs">
+                    {editableChecklist ? "Editável" : "Somente Leitura"}
+                  </Badge>
                 </div>
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3 max-h-60 overflow-y-auto border">
+                  {checklistItems.map((item: any, idx: number) => {
+                    const itemDesc = typeof item === 'string' ? item : item.descricao || item.item;
+                    return (
+                      <div key={idx} className="flex items-start gap-3 p-2 bg-background rounded border border-border/50">
+                        <div className="flex items-center h-5">
+                          <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium">{itemDesc}</p>
+                          {editableChecklist && (
+                            <Input
+                              placeholder="Adicionar observações ou evidências necessárias..."
+                              className="text-xs h-8"
+                              onChange={(e) => {
+                                const updated = [...checklistItems];
+                                if (typeof updated[idx] === 'string') {
+                                  updated[idx] = { descricao: updated[idx], observacao: e.target.value };
+                                } else {
+                                  updated[idx] = { ...updated[idx], observacao: e.target.value };
+                                }
+                                setChecklistItems(updated);
+                              }}
+                            />
+                          )}
+                        </div>
+                        {typeof item === 'object' && item.obrigatorio && (
+                          <Badge variant="destructive" className="text-xs">Obrigatório</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  💡 Este checklist será incluído na OS e deverá ser preenchido durante a execução dos serviços
+                </p>
               </div>
             </>
           )}
