@@ -41,7 +41,7 @@ export function AdminSidebar({ collapsed, isActive }: AdminSidebarProps) {
     {
       label: "Sistema",
       items: [
-        { name: "Relatórios", href: "/relatorios", icon: FileText },
+        { name: "Relatórios", href: "/admin/relatorios", icon: FileText },
         { name: "Configurações", href: "/config", icon: Settings },
       ],
     },

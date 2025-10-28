@@ -24,6 +24,8 @@ import Conformidade from "@/pages/Conformidade";
 import Configuracoes from "@/pages/Configuracoes";
 import Preventivas from "@/pages/Preventivas";
 import Relatorios from "@/pages/Relatorios";
+import AdminRelatorios from "@/pages/admin/AdminRelatorios";
+import SindicoRelatorios from "@/pages/sindico/SindicoRelatorios";
 import CondominioDetalhe from "@/pages/CondominioDetalhe";
 import AtivoDetalhe from "@/pages/AtivoDetalhe";
 import HomeRedirect from "@/pages/HomeRedirect";
@@ -151,6 +153,22 @@ export default function App() {
                 <Route path="agenda" element={<Agenda />} />
                 <Route path="manutencao-predial" element={<ManutencaoPredial />} />
                 <Route path="relatorios" element={<Relatorios />} />
+                <Route 
+                  path="admin/relatorios" 
+                  element={
+                    <RequireOwner>
+                      <AdminRelatorios />
+                    </RequireOwner>
+                  } 
+                />
+                <Route 
+                  path="sindico/relatorios" 
+                  element={
+                    <RequireRole allowed={["sindico", "admin"]}>
+                      <SindicoRelatorios />
+                    </RequireRole>
+                  } 
+                />
                 <Route 
                   path="config" 
                   element={
