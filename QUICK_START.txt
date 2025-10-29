@@ -1,0 +1,89 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                  SUPABASE SEEDS - QUICK START GUIDE                        ║
+║                     NBR 5674 Compliance & Admin User                       ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 WHAT WAS CREATED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Global Asset Library with 14 compliance categories + 20 asset types
+✓ Complete NBR 5674 preventive maintenance checklists
+✓ Admin user setup (alessandrabastojansen@gmail.com)
+✓ Zero UI changes - original colors preserved 100%
+
+📁 FILES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+supabase/seed.sql              ← Run this first (asset library)
+supabase/admin_master.sql      ← Run this second (user setup)
+scripts/create_admin_master.ts ← Optional automation script
+README_SEEDS.md                ← Full documentation
+docs/mapping_needed.md         ← Schema compatibility notes
+
+🚀 QUICK START (3 STEPS)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1: Populate Asset Library
+───────────────────────────────
+Go to: Supabase Dashboard → SQL Editor
+Copy/paste: supabase/seed.sql
+Click: Run (or Ctrl+Enter)
+Result: ✓ 14 categories + 20 assets inserted
+
+STEP 2: Create Admin User (Choose A or B)
+──────────────────────────────────────────
+Option A - Manual (No Service Role needed):
+  1. Go to: Dashboard → Authentication → Add User
+  2. Email: alessandrabastojansen@gmail.com
+  3. Password: Vl2301;;
+  4. ☑ Check "Auto Confirm User"
+  5. Click: Create User
+
+Option B - Automated (Requires Service Role key):
+  1. Add to .env: SUPABASE_SERVICE_ROLE=your_key
+  2. Run: npx tsx scripts/create_admin_master.ts
+
+STEP 3: Link User Profile
+──────────────────────────
+Go to: Supabase Dashboard → SQL Editor
+Copy/paste: supabase/admin_master.sql
+Click: Run
+Result: ✓ User profile created with 'admin' role
+
+🔑 LOGIN CREDENTIALS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Email:    alessandrabastojansen@gmail.com
+Password: Vl2301;;
+Role:     admin
+
+⚠️  Change password immediately after first login in production!
+
+✅ VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Run in SQL Editor to verify:
+
+-- Check categories
+SELECT COUNT(*) as categories FROM public.conf_categorias;
+-- Expected: 14
+
+-- Check assets
+SELECT COUNT(*) as assets FROM public.ativo_tipos;
+-- Expected: 20 or more
+
+-- Check admin user
+SELECT u.email, ur.role
+FROM public.usuarios u
+JOIN public.user_roles ur ON ur.user_id = u.id
+WHERE u.email = 'alessandrabastojansen@gmail.com';
+-- Expected: 1 row with role 'admin'
+
+🎯 KEY FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✓ Fully idempotent - safe to re-run
+✓ NBR 5674 compliant checklists
+✓ 78 normative references included
+✓ Global library for all condos
+✓ Auto-generates condo maintenance plans
+✓ No UI/color changes
+
+📖 NEED MORE DETAILS?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+See: README_SEEDS.md for complete documentation

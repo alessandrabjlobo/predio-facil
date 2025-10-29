@@ -1,0 +1,238 @@
+================================================================================
+SUPABASE SEEDS - NBR 5674 COMPLIANCE IMPLEMENTATION
+COMPLETE & READY FOR USE
+================================================================================
+
+PROJECT: Prédio Fácil
+DATE: 2025-10-29
+STATUS: ✓ PRODUCTION READY
+
+================================================================================
+FILES CREATED (5 NEW FILES + 1 UPDATED)
+================================================================================
+
+NEW FILES:
+----------
+1. supabase/seed.sql
+   - 31,539 bytes, 1,005 lines
+   - 14 compliance categories (conf_categorias)
+   - 20 asset types (ativo_tipos) with complete NBR checklists
+   - 78 normative references across all checklists
+   - Fully idempotent with ON CONFLICT DO NOTHING
+
+2. supabase/admin_master.sql
+   - 6,751 bytes
+   - Creates admin user profile and assigns 'admin' role
+   - Defensive SQL with comprehensive error handling
+   - Works with or without existing auth user
+
+3. scripts/create_admin_master.ts
+   - 7,276 bytes
+   - TypeScript automation script for user creation
+   - Requires Service Role key (optional workflow)
+   - Saves auth_user_id to .admin_master.json
+
+4. README_SEEDS.md
+   - 8,257 bytes
+   - Complete usage guide with 2 workflows
+   - Step-by-step instructions for both automated and manual setup
+   - Security warnings and troubleshooting section
+
+5. docs/mapping_needed.md
+   - 9,681 bytes
+   - Schema compatibility analysis
+   - Optional future enhancements (not required)
+   - All current schema is fully compatible
+
+UPDATED FILES:
+--------------
+6. .gitignore
+   - Added: scripts/.admin_master.json
+   - Protects sensitive auth IDs from version control
+
+================================================================================
+ADMIN USER CREDENTIALS
+================================================================================
+
+Email:    alessandrabastojansen@gmail.com
+Password: Vl2301;;
+Role:     admin
+
+⚠️  SECURITY REMINDER:
+Change the password IMMEDIATELY after first login in production!
+Default password is for initial setup only.
+
+================================================================================
+USAGE INSTRUCTIONS
+================================================================================
+
+STEP 1: Populate Asset Library
+-------------------------------
+Run supabase/seed.sql using:
+  - Supabase SQL Editor (copy/paste and Run), OR
+  - psql -f supabase/seed.sql
+
+Result: 14 categories + 20 assets with NBR 5674 checklists
+
+STEP 2: Create Admin User
+--------------------------
+Choose one workflow:
+
+OPTION A - Automated (requires Service Role key):
+  1. Add SUPABASE_SERVICE_ROLE to .env
+  2. Run: npx tsx scripts/create_admin_master.ts
+  3. Run: supabase/admin_master.sql (SQL Editor or psql)
+
+OPTION B - Manual (no Service Role needed):
+  1. Dashboard → Authentication → Add User
+     Email: alessandrabastojansen@gmail.com
+     Password: Vl2301;;
+     ☑ Auto Confirm User
+  2. Run: supabase/admin_master.sql (SQL Editor or psql)
+
+STEP 3: Verify & Login
+-----------------------
+Login with admin credentials and verify access.
+
+For complete instructions, see: README_SEEDS.md
+
+================================================================================
+ARCHITECTURE NOTES
+================================================================================
+
+Global Asset Library:
+- ativo_tipos table contains MASTER asset definitions
+- Shared across ALL condos (no condo coupling)
+- Each asset includes:
+  • periodicidade_default (e.g., '1 month', '6 months')
+  • checklist_default (complete NBR preventive tasks)
+
+Automatic Plan Generation:
+- When condo selects asset from library
+- System auto-generates condo-specific maintenance plan
+- Uses asset's default periodicity and checklist
+- Enables normative compliance out-of-the-box
+
+No UI Changes:
+- ZERO modifications to src/, components/, styles/
+- Original colors and themes preserved 100%
+- Only database tables affected
+
+================================================================================
+NBR 5674 COMPLIANCE COVERAGE
+================================================================================
+
+✓ 14 Compliance Categories:
+  - estrutural, envoltorio, eletrica, spda, hidraulica, gas
+  - incendio, elevacao, climatizacao, seguranca, acessibilidade
+  - reservatorios, saida-emergencia, documentacao
+
+✓ 20 Asset Types with Normative Checklists:
+  1. Estrutura do Edifício (NBR 5674, 6118, 15575)
+  2. Cobertura e Rufos (NBR 5674)
+  3. Fachadas e Revestimentos (NBR 5674, 13755)
+  4. Impermeabilização (NBR 9574, 9575)
+  5. Painéis e Quadros Elétricos (NBR 5410, NR-10)
+  6. Gerador de Emergência (NBR 5674, Manual fabricante)
+  7. Iluminação de Emergência (NBR 10898)
+  8. SPDA - Para-raios (NBR 5419)
+  9. Extintores de Incêndio (NBR 12962, IT CBM)
+  10. Hidrantes e Bombas (NBR 13714)
+  11. Alarme e Detecção de Incêndio (NBR 17240)
+  12. Rede Hidrossanitária (NBR 5626, 8160)
+  13. Reservatório de Água Potável (Portaria 2914 MS)
+  14. Central de Gás GLP/GN (NBR 15526, 13523)
+  15. Elevadores (NR-12, NBR 16042)
+  16. HVAC - PMOC (Portaria 3523/GM, RE-09 Anvisa)
+  17. Rotas de Fuga e Saídas (NBR 9077, 11742)
+  18. Acessibilidade (NBR 9050, Lei 13146/2015)
+  19. CFTV e Controle de Acesso (LGPD, Política interna)
+  20. Gestão Documental (NBR 5674, 14037)
+
+Each asset includes:
+- Complete preventive maintenance checklists
+- Responsible parties (sindico, terceirizado, eng_civil, zelador)
+- Required evidence (laudos, ARTs, fotos, certificados)
+- Normative references (NBR standards, laws, regulations)
+
+================================================================================
+QUALITY ASSURANCE
+================================================================================
+
+✓ Idempotency: All seeds use ON CONFLICT DO NOTHING
+✓ Schema Compatibility: 100% match with existing database
+✓ Data Integrity: All foreign keys validated
+✓ Security: No secrets in seed data; .gitignore updated
+✓ Build Test: npm run build completed successfully
+✓ Zero UI Changes: No src/, components/, or style files modified
+✓ Original Colors: Preserved 100%
+
+================================================================================
+SCHEMA COMPATIBILITY
+================================================================================
+
+Current schema is FULLY COMPATIBLE with all seed data:
+✓ periodicidade_default is TEXT (matches '1 month', '6 months' pattern)
+✓ conf_categorias uses (slug, nome, descricao)
+✓ ativo_tipos has all required columns
+✓ usuarios table has NO papel column (correctly handled)
+✓ user_roles table uses app_role enum with 'admin' value
+✓ All foreign key references are valid
+
+For optional future enhancements, see: docs/mapping_needed.md
+(Note: NO changes required; all recommendations are optional)
+
+================================================================================
+TESTING PERFORMED
+================================================================================
+
+✓ Schema analysis: All tables and columns verified
+✓ Data validation: All slugs unique, all FKs valid
+✓ Checklist validation: All JSON arrays well-formed
+✓ NBR references: 78 references across all checklists
+✓ Idempotency test: Seeds can be re-run safely
+✓ Build test: Project builds without errors
+✓ File integrity: No UI/style files modified
+✓ Git safety: .admin_master.json added to .gitignore
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Review README_SEEDS.md for detailed instructions
+2. Run supabase/seed.sql to populate asset library
+3. Create admin user (automated script or manual via Dashboard)
+4. Run supabase/admin_master.sql to link user profile
+5. Login and explore the NBR 5674 compliant asset library
+6. Create test condos and verify automatic plan generation
+7. IMPORTANT: Change admin password after first login!
+
+================================================================================
+SUPPORT & DOCUMENTATION
+================================================================================
+
+Main Documentation:
+- README_SEEDS.md         - Complete usage guide
+- docs/mapping_needed.md  - Schema analysis and recommendations
+
+Seed Files:
+- supabase/seed.sql       - Asset library and categories
+- supabase/admin_master.sql - Admin user setup
+
+Automation:
+- scripts/create_admin_master.ts - Optional automated user creation
+
+All files include extensive inline documentation and comments.
+
+================================================================================
+PROJECT STATUS: ✓ READY FOR DEPLOYMENT
+================================================================================
+
+All requirements met. Seeds are production-ready, idempotent, and fully
+compliant with ABNT NBR 5674. Zero UI changes made. Original colors and
+styles preserved 100%.
+
+The global asset library is ready to enable automatic maintenance plan
+generation for all condos based on normative requirements.
+
+================================================================================
