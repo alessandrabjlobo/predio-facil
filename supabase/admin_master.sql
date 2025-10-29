@@ -1,5 +1,5 @@
 -- ============================================================================
--- ADMIN MASTER USER SETUP - DEFENSIVE & IDEMPOTENT
+-- ADMIN MASTER USER SETUP - FULLY IDEMPOTENT WITH MERGE-STYLE UPSERT
 -- ============================================================================
 --
 -- This script creates/links the admin master user:
@@ -8,11 +8,11 @@
 --
 -- Requirements:
 -- 1. User must exist in auth.users (create via Dashboard or Service Role script)
--- 2. Script is fully idempotent and defensive
--- 3. Handles missing tables/columns gracefully with NOTICE messages
+-- 2. Script is fully idempotent and defensive (safe to rerun)
+-- 3. Uses SELECT + INSERT/UPDATE pattern (MERGE-style upsert)
+-- 4. Handles missing tables/columns gracefully with NOTICE messages
 --
--- Note: app_role enum does NOT include 'admin_master', so this script uses
--- 'admin' role. For future enum extension, see docs/mapping_needed.md
+-- Note: We use 'admin' role (app_role enum), not 'admin_master'
 -- ============================================================================
 
 DO $$
@@ -21,6 +21,7 @@ DECLARE
   v_user_id UUID;
   v_user_email TEXT := 'alessandrabastojansen@gmail.com';
   v_user_nome TEXT := 'Alessandra Basto Jansen';
+  v_exists BOOLEAN;
 BEGIN
   -- ============================================================================
   -- STEP 1: Resolve auth_user_id from auth.users
@@ -55,31 +56,31 @@ BEGIN
   END;
 
   -- ============================================================================
-  -- STEP 2: Upsert into public.usuarios
+  -- STEP 2: Upsert into public.usuarios (MERGE-style)
   -- ============================================================================
 
   BEGIN
-    -- Check if user already exists in public.usuarios
-    SELECT id INTO v_user_id
+    -- Check if user already exists
+    SELECT id, (id IS NOT NULL) INTO v_user_id, v_exists
     FROM public.usuarios
     WHERE auth_user_id = v_auth_user_id
     LIMIT 1;
 
-    IF v_user_id IS NULL THEN
-      -- Insert new user profile
-      INSERT INTO public.usuarios (auth_user_id, email, nome)
-      VALUES (v_auth_user_id, v_user_email, v_user_nome)
-      RETURNING id INTO v_user_id;
-
-      RAISE NOTICE '✓ Created user profile in public.usuarios (id: %)', v_user_id;
-    ELSE
-      -- Update existing user profile
+    IF v_exists THEN
+      -- User exists, update it
       UPDATE public.usuarios
       SET email = v_user_email,
           nome = v_user_nome
       WHERE id = v_user_id;
 
       RAISE NOTICE '✓ Updated user profile in public.usuarios (id: %)', v_user_id;
+    ELSE
+      -- User doesn't exist, insert it
+      INSERT INTO public.usuarios (auth_user_id, email, nome)
+      VALUES (v_auth_user_id, v_user_email, v_user_nome)
+      RETURNING id INTO v_user_id;
+
+      RAISE NOTICE '✓ Created user profile in public.usuarios (id: %)', v_user_id;
     END IF;
 
   EXCEPTION
@@ -94,20 +95,21 @@ BEGIN
   END;
 
   -- ============================================================================
-  -- STEP 3: Assign admin role in public.user_roles
+  -- STEP 3: Assign admin role in public.user_roles (MERGE-style)
   -- ============================================================================
 
   BEGIN
     -- Check if role already exists
-    IF NOT EXISTS (
+    SELECT EXISTS (
       SELECT 1 FROM public.user_roles
       WHERE user_id = v_user_id
       AND role = 'admin'::app_role
-    ) THEN
-      -- Insert admin role
+    ) INTO v_exists;
+
+    IF NOT v_exists THEN
+      -- Role doesn't exist, insert it
       INSERT INTO public.user_roles (user_id, role)
-      VALUES (v_user_id, 'admin'::app_role)
-      ON CONFLICT (user_id, role) DO NOTHING;
+      VALUES (v_user_id, 'admin'::app_role);
 
       RAISE NOTICE '✓ Assigned role ''admin'' in public.user_roles';
     ELSE
