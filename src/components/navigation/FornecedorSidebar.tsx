@@ -70,8 +70,8 @@ function Section({
             to={item.href}
             className={`flex items-center ${collapsed ? "justify-center" : "space-x-3"} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               isActive(item.href)
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                : "text-sidebar-foreground hover:bg-sidebar-muted"
             }`}
             title={collapsed ? item.name : undefined}
           >

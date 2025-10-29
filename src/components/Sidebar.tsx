@@ -89,12 +89,12 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   };
 
   return (
-    <div className={`${collapsed ? "w-16" : "w-64"} bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300 h-screen sticky top-0 shadow-lg`}>
+    <div className={`${collapsed ? "w-16" : "w-64"} bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col transition-all duration-300 h-screen sticky top-0 shadow-sm`}>
       {/* Logo */}
-      <div className="p-4 border-b border-sidebar-accent/30">
+      <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
-          <Building2 className="h-6 w-6" />
-          {!collapsed && <span className="font-bold text-lg">Prédio Fácil</span>}
+          <Building2 className="h-6 w-6 text-primary" />
+          {!collapsed && <span className="font-bold text-lg text-sidebar-foreground">Prédio Fácil</span>}
         </div>
       </div>
 
@@ -102,22 +102,22 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       {renderNavigation()}
 
       {/* Footer: User info */}
-      <div className="mt-auto border-t border-sidebar-accent/30 p-4">
+      <div className="mt-auto border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-semibold">
+          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-semibold">
             {userName ? userName.charAt(0).toUpperCase() : "U"}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate">{userName || "Usuário"}</div>
-              <div className="text-xs opacity-80 truncate capitalize">{role || "..."}</div>
+              <div className="text-sm font-medium truncate text-sidebar-foreground">{userName || "Usuário"}</div>
+              <div className="text-xs text-muted-foreground truncate capitalize">{role || "..."}</div>
             </div>
           )}
         </div>
         {!collapsed && (
           <button
             onClick={handleLogout}
-            className="mt-3 w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-sidebar-accent transition"
+            className="mt-3 w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md text-sidebar-foreground hover:bg-sidebar-muted transition"
           >
             <LogOut className="h-4 w-4" />
             <span>Sair</span>
