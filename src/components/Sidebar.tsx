@@ -89,42 +89,40 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   };
 
   return (
-    <div className={`${collapsed ? "w-16" : "w-64"} bg-white border-r border-border flex flex-col transition-all duration-300 h-screen sticky top-0`}>
+    <div className={`${collapsed ? "w-16" : "w-64"} bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300 h-screen sticky top-0 shadow-lg`}>
       {/* Logo */}
-      <div className="h-16 px-6 border-b border-border flex items-center">
-        <div className="flex items-center space-x-3">
-          <div className="flex-shrink-0 h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Building2 className="h-5 w-5 text-white" />
-          </div>
-          {!collapsed && (
-            <div>
-              <h1 className="text-lg font-bold">CondoMaintain</h1>
-              <p className="text-xs text-muted-foreground">NBR 5674</p>
-            </div>
-          )}
+      <div className="p-4 border-b border-sidebar-accent/30">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-6 w-6" />
+          {!collapsed && <span className="font-bold text-lg">Prédio Fácil</span>}
         </div>
       </div>
 
       {/* Navegação */}
       {renderNavigation()}
 
-      {/* Rodapé - sem seletor de condomínio (evita duplicidade com Header) */}
-      <div className="p-4 border-t border-border space-y-3">
-        {!collapsed && (
-          <div className="mb-3">
-            <p className="text-sm font-medium text-foreground">{userName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{role}</p>
+      {/* Footer: User info */}
+      <div className="mt-auto border-t border-sidebar-accent/30 p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-semibold">
+            {userName ? userName.charAt(0).toUpperCase() : "U"}
           </div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium truncate">{userName || "Usuário"}</div>
+              <div className="text-xs opacity-80 truncate capitalize">{role || "..."}</div>
+            </div>
+          )}
+        </div>
+        {!collapsed && (
+          <button
+            onClick={handleLogout}
+            className="mt-3 w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-sidebar-accent transition"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Sair</span>
+          </button>
         )}
-        <Button
-          variant="ghost"
-          className={`w-full ${collapsed ? 'justify-center' : 'justify-start'} text-destructive hover:text-destructive hover:bg-destructive/10`}
-          onClick={handleLogout}
-          title={collapsed ? "Sair" : undefined}
-        >
-          <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">Sair</span>}
-        </Button>
       </div>
     </div>
   );

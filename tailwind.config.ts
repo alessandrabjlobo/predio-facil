@@ -22,18 +22,16 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-
         primary: {
-          DEFAULT: "hsl(200, 70%, 45%)", // azul-petróleo
-          foreground: "hsl(0, 0%, 100%)",
-          hover: "hsl(200, 70%, 40%)",
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
         destructive: {
-          DEFAULT: "hsl(0, 84%, 60%)",
+          DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
@@ -43,19 +41,6 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
-          hover: "hsl(var(--accent-hover))",
-        },
-        success: {
-          DEFAULT: "hsl(142, 71%, 45%)", // verde
-          foreground: "hsl(0, 0%, 100%)",
-        },
-        warning: {
-          DEFAULT: "hsl(38, 92%, 50%)", // âmbar
-          foreground: "hsl(0, 0%, 0%)",
-        },
-        danger: {
-          DEFAULT: "hsl(0, 84%, 60%)", // vermelho
-          foreground: "hsl(0, 0%, 100%)",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -65,21 +50,14 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+        },
       },
-
-      backgroundImage: {
-        "gradient-hero": "var(--gradient-hero)",
-        "gradient-card": "var(--gradient-card)",
-      },
-
-      boxShadow: {
-        card: "var(--shadow-card)",
-        "card-hover": "var(--shadow-hover)",
-        soft: "0 2px 8px rgba(0,0,0,0.08)",
-      },
-
       borderRadius: {
-        "2xl": "16px",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",

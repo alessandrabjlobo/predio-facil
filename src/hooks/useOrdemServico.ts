@@ -99,7 +99,7 @@ export const useOrdemServico = () => {
       });
 
       // 🚀 Chamada RPC corrigida
-      const { data, error } = await supabase.rpc("criar_os", {
+      const { data, error } = await supabase.rpc("criar_os_detalhada", {
         p_condominio_id: condominio.id,
         p_plano_id: planoId || null,
         p_ativo_id: ativoId,

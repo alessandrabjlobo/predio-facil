@@ -79,7 +79,7 @@ function Section({
   return (
     <div>
       {!collapsed && (
-        <h3 className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        <h3 className="px-3 mb-2 text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
           {label}
         </h3>
       )}
@@ -90,8 +90,8 @@ function Section({
             to={item.href}
             className={`flex items-center ${collapsed ? "justify-center" : "space-x-3"} px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               isActive(item.href)
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
             }`}
             title={collapsed ? item.name : undefined}
           >
