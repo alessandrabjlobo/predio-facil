@@ -13,13 +13,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClipboardList, Plus } from "lucide-react";
+import { Wrench, Plus } from "lucide-react";
 import { useCondominioAtual } from "@/hooks/useCondominioAtual";
 import { CondominioSwitcher } from "@/components/CondominioSwitcher";
-import { ChamadosFilters } from "@/components/maintenance/ChamadosFilters";
-import { ChamadoDrawer } from "@/components/maintenance/ChamadoDrawer";
+import { OSFilters } from "@/components/maintenance/OSFilters";
+import { OSDrawer } from "@/components/maintenance/OSDrawer";
 import { EmptyState } from "@/components/patterns/EmptyState";
-import { fetchChamadosList } from "@/lib/queries/maintenance";
+import { KPICards } from "@/components/patterns/KPICards";
+import { fetchOSList, fetchOSResumo } from "@/lib/queries/maintenance";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -32,47 +33,38 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
-const getPrioridadeColor = (prioridade: string) => {
+const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
-    baixa: "bg-blue-100 text-blue-800",
-    media: "bg-yellow-100 text-yellow-800",
-    alta: "bg-orange-100 text-orange-800",
-    urgente: "bg-red-100 text-red-800",
+    aberta: "bg-blue-100 text-blue-800",
+    em_andamento: "bg-yellow-100 text-yellow-800",
+    aguardando_validacao: "bg-purple-100 text-purple-800",
+    concluida: "bg-green-100 text-green-800",
+    cancelada: "bg-gray-100 text-gray-800",
   };
-  return colors[prioridade] || "bg-gray-100 text-gray-800";
+  return colors[status] || "bg-gray-100 text-gray-800";
 };
 
-const getCriticidadeColor = (criticidade: string) => {
-  const colors: Record<string, string> = {
-    P1: "bg-red-500 text-white",
-    P2: "bg-orange-500 text-white",
-    P3: "bg-yellow-500 text-white",
-    P4: "bg-green-500 text-white",
-  };
-  return colors[criticidade] || "bg-gray-500 text-white";
-};
-
-export default function Chamados() {
+export default function OSPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { condominio } = useCondominioAtual();
 
-  const [chamados, setChamados] = useState<any[]>([]);
+  const [osList, setOsList] = useState<any[]>([]);
+  const [resumo, setResumo] = useState<any>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selectedChamado, setSelectedChamado] = useState<any>(null);
+  const [selectedOS, setSelectedOS] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Filtros e paginação
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [selectedStatus, setSelectedStatus] = useState<string[]>(
     searchParams.get("status")?.split(",").filter(Boolean) || []
   );
-  const [selectedPrioridade, setSelectedPrioridade] = useState<string[]>(
-    searchParams.get("prioridade")?.split(",").filter(Boolean) || []
-  );
-  const [selectedCriticidade, setSelectedCriticidade] = useState<string[]>(
-    searchParams.get("criticidade")?.split(",").filter(Boolean) || []
-  );
+  const [dateRange, setDateRange] = useState({
+    start: searchParams.get("dataInicio") || "",
+    end: searchParams.get("dataFim") || "",
+  });
   const [currentPage, setCurrentPage] = useState(
     parseInt(searchParams.get("page") || "0")
   );
@@ -80,53 +72,70 @@ export default function Chamados() {
 
   const debouncedSearch = useDebounce(search, 300);
 
+  // Atualizar URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (selectedStatus.length) params.set("status", selectedStatus.join(","));
-    if (selectedPrioridade.length)
-      params.set("prioridade", selectedPrioridade.join(","));
-    if (selectedCriticidade.length)
-      params.set("criticidade", selectedCriticidade.join(","));
+    if (dateRange.start) params.set("dataInicio", dateRange.start);
+    if (dateRange.end) params.set("dataFim", dateRange.end);
     if (currentPage > 0) params.set("page", currentPage.toString());
 
     setSearchParams(params);
   }, [
     debouncedSearch,
     selectedStatus,
-    selectedPrioridade,
-    selectedCriticidade,
+    dateRange,
     currentPage,
     setSearchParams,
   ]);
 
+  // Buscar resumo (KPIs)
   useEffect(() => {
     if (!condominio?.id) {
-      setChamados([]);
+      setResumo(null);
+      return;
+    }
+
+    fetchOSResumo(condominio.id)
+      .then(({ data, error }) => {
+        if (error) throw error;
+        setResumo(data?.[0] || null);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar resumo de OS:", err);
+        setResumo(null);
+      });
+  }, [condominio?.id]);
+
+  // Buscar lista de OS
+  useEffect(() => {
+    if (!condominio?.id) {
+      setOsList([]);
       setLoading(false);
       return;
     }
 
     setLoading(true);
-    fetchChamadosList(
+    fetchOSList(
       condominio.id,
       {
         search: debouncedSearch,
         status: selectedStatus,
-        prioridade: selectedPrioridade,
-        criticidade: selectedCriticidade,
+        dataInicio: dateRange.start,
+        dataFim: dateRange.end,
       },
       currentPage,
       pageSize
     )
       .then(({ data, error, count }) => {
         if (error) throw error;
-        setChamados(data || []);
+        setOsList(data || []);
         setTotalCount(count || 0);
       })
       .catch((err) => {
-        console.error("Erro ao carregar chamados:", err);
-        setChamados([]);
+        console.error("Erro ao carregar OS:", err);
+        setOsList([]);
         setTotalCount(0);
       })
       .finally(() => setLoading(false));
@@ -134,44 +143,53 @@ export default function Chamados() {
     condominio?.id,
     debouncedSearch,
     selectedStatus,
-    selectedPrioridade,
-    selectedCriticidade,
+    dateRange,
     currentPage,
     pageSize,
   ]);
 
-  const handleRowClick = (chamado: any) => {
-    setSelectedChamado(chamado);
+  const handleRowClick = (os: any) => {
+    setSelectedOS(os);
     setDrawerOpen(true);
   };
 
   const totalPages = Math.ceil(totalCount / pageSize);
 
+  const kpiData = resumo
+    ? [
+        { label: "Total de OS", value: resumo.total_os || 0 },
+        { label: "Abertas", value: resumo.abertas || 0 },
+        { label: "Em Andamento", value: resumo.em_andamento || 0 },
+        { label: "Concluídas", value: resumo.concluidas || 0 },
+      ]
+    : [];
+
   return (
     <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
       <PageHeader
-        title="Chamados"
-        subtitle="Gerencie solicitações de manutenção e serviços"
-        icon={ClipboardList}
+        title="Ordens de Serviço"
+        subtitle="Gerencie e acompanhe todas as ordens de serviço"
+        icon={Wrench}
         actions={
           <>
             <CondominioSwitcher />
-            <Button onClick={() => navigate("/chamados/novo")}>
+            <Button onClick={() => navigate("/os/novo")}>
               <Plus className="h-4 w-4 mr-2" />
-              Novo Chamado
+              Nova OS
             </Button>
           </>
         }
       />
 
-      <ChamadosFilters
+      {/* KPIs */}
+      {resumo && <KPICards data={kpiData} />}
+
+      <OSFilters
         onSearchChange={setSearch}
         onStatusChange={setSelectedStatus}
-        onPrioridadeChange={setSelectedPrioridade}
-        onCriticidadeChange={setSelectedCriticidade}
+        onDateRangeChange={(start, end) => setDateRange({ start, end })}
         selectedStatus={selectedStatus}
-        selectedPrioridade={selectedPrioridade}
-        selectedCriticidade={selectedCriticidade}
+        dateRange={dateRange}
       />
 
       <Card>
@@ -181,14 +199,14 @@ export default function Chamados() {
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
           </div>
-        ) : chamados.length === 0 ? (
+        ) : osList.length === 0 ? (
           <EmptyState
-            icon={<ClipboardList className="h-12 w-12 text-muted-foreground" />}
-            title="Nenhum chamado encontrado"
-            description="Não há chamados com os filtros selecionados."
+            icon={<Wrench className="h-12 w-12 text-muted-foreground" />}
+            title="Nenhuma OS encontrada"
+            description="Não há ordens de serviço com os filtros selecionados."
             action={{
-              label: "Novo Chamado",
-              onClick: () => navigate("/chamados/novo"),
+              label: "Nova OS",
+              onClick: () => navigate("/os/novo"),
             }}
           />
         ) : (
@@ -196,46 +214,51 @@ export default function Chamados() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Título</TableHead>
+                  <TableHead>Número</TableHead>
+                  <TableHead>Chamado</TableHead>
                   <TableHead>Condomínio</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead>Criticidade</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Criado em</TableHead>
+                  <TableHead>Início Previsto</TableHead>
+                  <TableHead>Fim Previsto</TableHead>
+                  <TableHead className="text-right">Custo Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {chamados.map((chamado) => (
+                {osList.map((os) => (
                   <TableRow
-                    key={chamado.id}
-                    onClick={() => handleRowClick(chamado)}
+                    key={os.id}
+                    onClick={() => handleRowClick(os)}
                     className="cursor-pointer hover:bg-accent/50"
                   >
-                    <TableCell className="font-medium">
-                      {chamado.titulo}
-                    </TableCell>
-                    <TableCell>{chamado.condominio_nome}</TableCell>
-                    <TableCell>{chamado.categoria || "-"}</TableCell>
+                    <TableCell className="font-medium">{os.numero || "-"}</TableCell>
+                    <TableCell>{os.chamado_titulo || "Sem título"}</TableCell>
+                    <TableCell>{os.condominio_nome}</TableCell>
                     <TableCell>
-                      <Badge className={getPrioridadeColor(chamado.prioridade)}>
-                        {chamado.prioridade}
+                      <Badge className={getStatusColor(os.status)}>
+                        {os.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={getCriticidadeColor(chamado.criticidade)}
-                      >
-                        {chamado.criticidade}
-                      </Badge>
+                      {os.inicio_prev
+                        ? format(new Date(os.inicio_prev), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })
+                        : "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{chamado.status}</Badge>
+                      {os.fim_prev
+                        ? format(new Date(os.fim_prev), "dd/MM/yyyy", {
+                            locale: ptBR,
+                          })
+                        : "-"}
                     </TableCell>
-                    <TableCell>
-                      {format(new Date(chamado.created_at), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
+                    <TableCell className="text-right">
+                      {os.custo_total !== null && os.custo_total !== undefined
+                        ? new Intl.NumberFormat("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          }).format(os.custo_total)
+                        : "-"}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -248,9 +271,7 @@ export default function Chamados() {
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
-                        onClick={() =>
-                          setCurrentPage((p) => Math.max(0, p - 1))
-                        }
+                        onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
                         className={
                           currentPage === 0
                             ? "pointer-events-none opacity-50"
@@ -265,10 +286,7 @@ export default function Chamados() {
                           ? i
                           : Math.max(
                               0,
-                              Math.min(
-                                currentPage - 2,
-                                totalPages - 5
-                              )
+                              Math.min(currentPage - 2, totalPages - 5)
                             ) + i;
 
                       return (
@@ -304,11 +322,7 @@ export default function Chamados() {
         )}
       </Card>
 
-      <ChamadoDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        chamado={selectedChamado}
-      />
+      <OSDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} os={selectedOS} />
     </div>
   );
 }

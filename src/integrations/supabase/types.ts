@@ -977,11 +977,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "nao_conformidades_gerou_os_corretiva_id_fkey"
+            columns: ["gerou_os_corretiva_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nao_conformidades_gerou_os_corretiva_id_fkey"
+            columns: ["gerou_os_corretiva_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
+          },
+          {
             foreignKeyName: "nao_conformidades_os_id_fkey"
             columns: ["os_id"]
             isOneToOne: false
             referencedRelation: "os"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nao_conformidades_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nao_conformidades_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
           },
         ]
       }
@@ -1384,6 +1412,20 @@ export type Database = {
             referencedRelation: "os"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "os_anexos_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_anexos_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
+          },
         ]
       }
       os_checklist_itens: {
@@ -1425,6 +1467,72 @@ export type Database = {
             referencedRelation: "os"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "os_checklist_itens_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_checklist_itens_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
+          },
+        ]
+      }
+      os_itens: {
+        Row: {
+          concluido: boolean | null
+          created_at: string | null
+          descricao: string
+          id: string
+          observacao: string | null
+          ordem: number | null
+          os_id: string
+        }
+        Insert: {
+          concluido?: boolean | null
+          created_at?: string | null
+          descricao: string
+          id?: string
+          observacao?: string | null
+          ordem?: number | null
+          os_id: string
+        }
+        Update: {
+          concluido?: boolean | null
+          created_at?: string | null
+          descricao?: string
+          id?: string
+          observacao?: string | null
+          ordem?: number | null
+          os_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_itens_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "os"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_itens_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_itens_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
+          },
         ]
       }
       os_logs: {
@@ -1459,6 +1567,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "os"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_logs_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_logs_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
           },
           {
             foreignKeyName: "os_logs_usuario_id_fkey"
@@ -1636,6 +1758,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "os"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "programacao_manutencao_os_id_fkey"
+            columns: ["os_id"]
+            isOneToOne: false
+            referencedRelation: "v_os_sla_atraso"
+            referencedColumns: ["os_id"]
           },
           {
             foreignKeyName: "programacao_manutencao_plano_id_fkey"
@@ -1835,6 +1971,145 @@ export type Database = {
             columns: ["executado_por"]
             isOneToOne: false
             referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_chamados_list: {
+        Row: {
+          categoria: string | null
+          condominio_id: string | null
+          condominio_nome: string | null
+          created_at: string | null
+          criticidade: string | null
+          descricao: string | null
+          id: string | null
+          local: string | null
+          prioridade: string | null
+          status: string | null
+          titulo: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamados_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_chamados_pipeline: {
+        Row: {
+          condominio_id: string | null
+          prioridade: string | null
+          qtd: number | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chamados_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_os_list: {
+        Row: {
+          chamado_titulo: string | null
+          condominio_id: string | null
+          condominio_nome: string | null
+          created_at: string | null
+          custo_total: number | null
+          fim_prev: string | null
+          id: string | null
+          inicio_prev: string | null
+          numero: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_os_pipeline: {
+        Row: {
+          condominio_id: string | null
+          custo_total: number | null
+          qtd: number | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_os_resumo: {
+        Row: {
+          abertas: number | null
+          concluidas: number | null
+          condominio_id: string | null
+          custo_medio: number | null
+          custo_total: number | null
+          em_andamento: number | null
+          total_os: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_os_sla_atraso: {
+        Row: {
+          atraso_horas: number | null
+          chamado_titulo: string | null
+          condominio_id: string | null
+          fim_prev: string | null
+          numero: string | null
+          os_id: string | null
+          status: string | null
+        }
+        Insert: {
+          atraso_horas?: never
+          chamado_titulo?: string | null
+          condominio_id?: string | null
+          fim_prev?: string | null
+          numero?: string | null
+          os_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          atraso_horas?: never
+          chamado_titulo?: string | null
+          condominio_id?: string | null
+          fim_prev?: string | null
+          numero?: string | null
+          os_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_condominio_id_fkey"
+            columns: ["condominio_id"]
+            isOneToOne: false
+            referencedRelation: "condominios"
             referencedColumns: ["id"]
           },
         ]
