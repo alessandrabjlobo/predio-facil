@@ -1,56 +1,45 @@
-// src/hooks/useCondominioId.ts
-import { useEffect, useState } from "react";
-import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCondominioId } from "./useCondominioId";
 
-type Maybe<T> = T | null;
+export const useAssetHistory = (ativoId?: string, limit?: number) => {
+  const { condominioId } = useCondominioId();
 
-export function useCondominioId() {
-  const [condominioId, setCondominioId] = useState<Maybe<string>>(getCurrentCondominioId());
-  const [loading, setLoading] = useState(!condominioId);
+  return useQuery({
+    queryKey: ["asset-history", condominioId, ativoId, limit],
+    enabled: !!ativoId && !!condominioId,
+    queryFn: async () => {
+      if (!ativoId || !condominioId) return { data: [], count: 0 };
 
-  // Fallback: se não houver nada salvo, tenta descobrir o principal do usuário logado
-  useEffect(() => {
-    if (condominioId) return;
+      let query = supabase
+        .from("os")
+        .select(
+          `
+          id,
+          numero,
+          titulo,
+          status,
+          status_validacao,
+          data_abertura,
+          data_conclusao,
+          origem,
+          prioridade,
+          -- relacionamentos explícitos como você já usa nos outros hooks:
+          executante:usuarios!os_executante_id_fkey(id, nome),
+          plano:planos_manutencao!os_plano_id_fkey(id, titulo, periodicidade)
+        `,
+          { count: "exact" }
+        )
+        .eq("ativo_id", ativoId)
+        .eq("condominio_id", condominioId) // <<< isolamento por condomínio
+        .order("data_abertura", { ascending: false });
 
-    (async () => {
-      try {
-        const {
-          data: me,
-        } = await supabase
-          .from("usuarios")
-          .select("id, auth_user_id")
-          .eq("auth_user_id", (await supabase.auth.getUser()).data.user?.id ?? "")
-          .single();
+      if (limit) query = query.limit(limit);
 
-        if (!me) { setLoading(false); return; }
+      const { data, error, count } = await query;
+      if (error) throw error;
 
-        const { data: uc } = await supabase
-          .from("usuarios_condominios")
-          .select("condominio_id")
-          .eq("usuario_id", me.id)
-          .eq("is_principal", true)
-          .maybeSingle();
-
-        if (uc?.condominio_id) {
-          setCondominioId(uc.condominio_id);
-          setCurrentCondominioId(uc.condominio_id);
-        }
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [condominioId]);
-
-  // Escuta troca feita no Switcher
-  useEffect(() => {
-    const h = () => {
-      const id = getCurrentCondominioId();
-      setCondominioId(id);
-    };
-    window.addEventListener("condominio:changed", h);
-    return () => window.removeEventListener("condominio:changed", h);
-  }, []);
-
-  return { condominioId, setCondominioId, loading };
-}
+      return { data: data ?? [], count: count ?? 0 };
+    },
+  });
+};
