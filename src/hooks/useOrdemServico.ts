@@ -18,7 +18,6 @@ export const useOrdemServico = () => {
   const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
-  // LISTAGEM (traz checklist + campos “ricos”)
   const { data: ordens, isLoading } = useQuery({
     queryKey: ["ordens-servico", condominioId],
     enabled: !!condominioId,
@@ -27,28 +26,11 @@ export const useOrdemServico = () => {
       const { data, error } = await supabase
         .from("os")
         .select(`
-          id,
-          numero,
-          titulo,
-          descricao,
-          status,
-          status_validacao,
-          origem,
-          prioridade,
-          data_abertura,
-          data_prevista,
-          sla_vencimento,
-          data_conclusao,
-          custo_previsto,
-          custo_aprovado,
-          custo_final,
-          executor_nome,
-          executor_contato,
-          tipo_executor,
-          local,
-          centro_custo,
-          pdf_path,
-          checklist,
+          id, numero, titulo, descricao, status, status_validacao, origem, prioridade,
+          data_abertura, data_prevista, sla_vencimento, data_conclusao,
+          custo_previsto, custo_aprovado, custo_final,
+          executor_nome, executor_contato, tipo_executor,
+          centro_custo, local, pdf_path, checklist,
           ativo:ativos(id, nome, tipo_id, local),
           plano:planos_manutencao(id, titulo, tipo, checklist),
           solicitante:usuarios!os_solicitante_id_fkey(id, nome),
@@ -62,7 +44,6 @@ export const useOrdemServico = () => {
     },
   });
 
-  // CRIAÇÃO (RPC se existir; fallback por INSERT garantindo checklist)
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
@@ -71,10 +52,12 @@ export const useOrdemServico = () => {
       descricao,
       tipo = "preventiva",
       prioridade = "media",
-      dataPrevista,
-      tipoExecutor = "externo",
-      executorNome,
-      executorContato,
+      dataPrevista,                    // YYYY-MM-DD (opcional)
+      slaDias,                         // number | undefined
+      tipoExecutor = "externo",        // 'interno' | 'externo'
+      executanteId,                    // quando interno
+      executorNome,                    // quando externo
+      executorContato,                 // quando externo
       custoPrevisto,
       centroCusto,
       local,
@@ -86,8 +69,10 @@ export const useOrdemServico = () => {
       descricao?: string;
       tipo?: "preventiva" | "corretiva" | string;
       prioridade?: string;
-      dataPrevista?: string; // YYYY-MM-DD
+      dataPrevista?: string;
+      slaDias?: number;
       tipoExecutor?: "interno" | "externo" | string;
+      executanteId?: string;
       executorNome?: string;
       executorContato?: string;
       custoPrevisto?: number;
@@ -97,7 +82,6 @@ export const useOrdemServico = () => {
     }) => {
       if (!condominioId) throw new Error("Condomínio não encontrado");
 
-      // pega usuarios.id do auth atual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -144,23 +128,28 @@ export const useOrdemServico = () => {
         }
       }
 
-      // 2) SLA default (30 dias) se não vier dataPrevista
-      const hoje = new Date();
-      const d = new Date(hoje);
-      d.setDate(d.getDate() + 30);
-      const slaVencimento = dataPrevista ?? d.toISOString().slice(0, 10);
+      // 2) Calcular SLA: prioridade p/ dataPrevista; se não vier, usar slaDias (default 30)
+      let slaVencimento: string;
+      if (dataPrevista) {
+        slaVencimento = dataPrevista;
+      } else {
+        const base = new Date();
+        const dias = typeof slaDias === "number" && Number.isFinite(slaDias) ? slaDias : 30;
+        base.setDate(base.getDate() + dias);
+        slaVencimento = base.toISOString().slice(0, 10);
+      }
 
-      // 3) Origem válida: preventiva | corretiva
+      // 3) Mapear origem válida
       const origem = (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva";
 
-      // 4) Tentar RPC (se existir com alguma assinatura compatível)
+      // 4) Tentar RPC (se existir no projeto)
       const tryRpc = await supabase.rpc("criar_os_detalhada", {
         p_condominio_id: condominioId,
         p_ativo_id: ativoId,
         p_titulo: titulo,
         p_plano_id: planoId ?? null,
         p_descricao: descricao ?? "",
-        p_tipo_manutencao: origem,             // ou p_tipo_os em versões antigas
+        p_tipo_manutencao: origem,             // compatível c/ p_tipo_os
         p_prioridade: prioridade ?? "media",
         p_tipo_executor: tipoExecutor ?? "externo",
         p_executor_nome: executorNome ?? null,
@@ -171,33 +160,44 @@ export const useOrdemServico = () => {
       });
 
       if (!tryRpc.error && tryRpc.data) {
-        return tryRpc.data; // sucesso via RPC
+        return tryRpc.data;
       }
 
-      // 5) Fallback: INSERT direto (campos existentes no seu schema)
+      // 5) Fallback INSERT direto
+      const insertPayload: any = {
+        condominio_id: condominioId,
+        plano_id: planoId ?? null,
+        ativo_id: ativoId,
+        solicitante_id: usuario.id,
+        titulo,
+        descricao: descricao ?? "",
+        status: "aberta",
+        origem,
+        prioridade: prioridade ?? "media",
+        tipo_executor: (tipoExecutor === "interno" || tipoExecutor === "externo") ? tipoExecutor : "externo",
+        data_abertura: new Date().toISOString(),
+        data_prevista: dataPrevista ?? null,
+        sla_vencimento: slaVencimento,
+        custo_previsto: typeof custoPrevisto === "number" ? custoPrevisto : null,
+        centro_custo: centroCusto ?? null,
+        local: local ?? null,
+        checklist: checklist ?? [],
+      };
+
+      // se for interno e existir coluna executante_id, grava:
+      if (insertPayload.tipo_executor === "interno" && executanteId) {
+        insertPayload.executante_id = executanteId;
+      }
+
+      // se for externo, grava nome/contato
+      if (insertPayload.tipo_executor === "externo") {
+        insertPayload.executor_nome = executorNome ?? null;
+        insertPayload.executor_contato = executorContato ?? null;
+      }
+
       const { data, error } = await supabase
         .from("os")
-        .insert({
-          condominio_id: condominioId,
-          plano_id: planoId ?? null,
-          ativo_id: ativoId,
-          solicitante_id: usuario.id,
-          titulo,
-          descricao: descricao ?? "",
-          status: "aberta",
-          origem,
-          prioridade: prioridade ?? "media",
-          tipo_executor: (tipoExecutor === "interno" || tipoExecutor === "externo") ? tipoExecutor : "externo",
-          executor_nome: executorNome ?? null,
-          executor_contato: executorContato ?? null,
-          data_abertura: new Date().toISOString(),
-          data_prevista: dataPrevista ?? null,
-          sla_vencimento: slaVencimento,
-          custo_previsto: typeof custoPrevisto === "number" ? custoPrevisto : null,
-          centro_custo: centroCusto ?? null,
-          local: local ?? null,
-          checklist: checklist ?? [],
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -217,7 +217,6 @@ export const useOrdemServico = () => {
     },
   });
 
-  // ATUALIZAR STATUS
   const updateOSStatus = useMutation({
     mutationFn: async ({ osId, status }: { osId: string; status: string }) => {
       const updates: any = { status };
@@ -248,7 +247,6 @@ export const useOrdemServico = () => {
     },
   });
 
-  // ATRIBUIR EXECUTOR
   const assignExecutor = useMutation({
     mutationFn: async ({ osId, executorNome, executorContato }:
       { osId: string; executorNome: string; executorContato: string }) => {
@@ -279,7 +277,6 @@ export const useOrdemServico = () => {
     },
   });
 
-  // VALIDAR OS
   const validateOS = useMutation({
     mutationFn: async ({ osId, aprovado, observacoes }:
       { osId: string; aprovado: boolean; observacoes?: string }) => {
