@@ -5,6 +5,9 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
+// ✅ importe o Provider do contexto
+import { CondominioAtualProvider } from "@/context/CondominioAtualContext";
+
 // Debug: Log env presence (will not expose secrets, only URL origin)
 console.info("ENV CHECK:", {
   VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
@@ -14,7 +17,10 @@ console.info("ENV CHECK:", {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      {/* ✅ envolve toda a app com o Provider */}
+      <CondominioAtualProvider>
+        <App />
+      </CondominioAtualProvider>
     </BrowserRouter>
   </React.StrictMode>
 );
