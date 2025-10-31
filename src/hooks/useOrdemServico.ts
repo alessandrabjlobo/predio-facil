@@ -8,7 +8,7 @@ export const useOrdemServico = () => {
   const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
-  /** 🧾 LISTAGEM DE OS */
+  // LISTAGEM
   const { data: ordens, isLoading } = useQuery({
     queryKey: ["ordens-servico", condominioId],
     enabled: !!condominioId,
@@ -46,14 +46,14 @@ export const useOrdemServico = () => {
     },
   });
 
-  /** 🧱 CRIAR OS (RPC estável + fallback) */
+  // CRIAÇÃO (RPC com fallback)
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
       ativoId,
       titulo,
       descricao,
-      tipo = "preventiva", // 'preventiva' | 'corretiva'
+      tipo = "preventiva",
       prioridade = "media",
       dataPrevista,
     }: {
@@ -67,7 +67,6 @@ export const useOrdemServico = () => {
     }) => {
       if (!condominioId) throw new Error("Condomínio não encontrado");
 
-      // usuário autenticado -> pega usuarios.id
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -76,22 +75,11 @@ export const useOrdemServico = () => {
         .select("id")
         .eq("auth_user_id", user.id)
         .single();
+
       if (eUsuario || !usuario?.id) throw new Error("Usuário não encontrado");
 
-      // 🚀 Chama a nova RPC estável: public.os_create
-      console.log("📦 RPC os_create payload:", {
-        p_condominio_id: condominioId,
-        p_ativo_id: ativoId,
-        p_responsavel_id: usuario.id,
-        p_titulo: titulo,
-        p_plano_id: planoId ?? null,
-        p_descricao: descricao ?? "",
-        p_prioridade: prioridade ?? "media",
-        p_tipo_os: tipo ?? "corretiva",
-        p_data_prevista: dataPrevista ?? null,
-      });
-
-      const rpc = await supabase.rpc("os_create", {
+      // tenta RPC (nome único e assinatura estável no banco)
+      const rpc = await supabase.rpc("criar_os_detalhada", {
         p_condominio_id: condominioId,
         p_ativo_id: ativoId,
         p_responsavel_id: usuario.id,
@@ -104,30 +92,26 @@ export const useOrdemServico = () => {
       });
 
       if (!rpc.error) {
-        // os_create retorna o uuid da nova OS
+        // retorna o UUID da OS criada (conforme função SQL)
         return rpc.data;
       }
 
-      // ⚠️ Se a função não existir / 404, cai no fallback
+      // Se a RPC não existe/exposta, cai pro fallback
       const msg = rpc.error.message?.toLowerCase() ?? "";
       const isMissing =
         (rpc as any).status === 404 ||
         msg.includes("not found") ||
-        msg.includes("does not exist");
+        msg.includes("does not exist") ||
+        (msg.includes("function") && msg.includes("does not exist"));
 
       if (!isMissing) {
-        console.error("❌ Erro RPC os_create:", rpc.error);
+        console.error("❌ Erro RPC criar_os_detalhada:", rpc.error);
         throw new Error(rpc.error.message || "Erro ao criar OS (RPC)");
       }
 
-      console.warn("↩️ RPC os_create ausente: usando fallback INSERT em public.os");
+      console.warn("↩️ RPC ausente: usando fallback INSERT em public.os");
 
-      // ✅ Fallback compatível com seu schema:
-      // - status inicial 'aberta' (válido no CHECK)
-      // - origem = 'preventiva' | 'corretiva'
-      // - NÃO inserir coluna inexistente (tipo_os NÃO existe)
-      const origemValidada = (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva";
-
+      // Fallback corrigido: status e colunas válidas
       const { data, error } = await supabase
         .from("os")
         .insert({
@@ -136,11 +120,12 @@ export const useOrdemServico = () => {
           ativo_id: ativoId,
           titulo,
           descricao: descricao ?? "",
-          status: "aberta",
+          status: "aberta", // <-- válido no teu enum
           prioridade: prioridade ?? "media",
-          origem: origemValidada,
+          origem: (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva", // <-- mapeia corretamente
           data_abertura: new Date().toISOString(),
           data_prevista: dataPrevista ?? null,
+          // NADA de "tipo_os": essa coluna não existe no schema
         })
         .select()
         .single();
@@ -149,14 +134,12 @@ export const useOrdemServico = () => {
         console.error("❌ Erro INSERT fallback em os:", error);
         throw error;
       }
-      return data?.id ?? null;
+      return data;
     },
-
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
       toast({ title: "Sucesso", description: "Ordem de Serviço criada com sucesso!" });
     },
-
     onError: (error: any) => {
       toast({
         title: "Erro",
@@ -166,7 +149,7 @@ export const useOrdemServico = () => {
     },
   });
 
-  /** 🔄 ATUALIZAR STATUS */
+  // ATUALIZAR STATUS
   const updateOSStatus = useMutation({
     mutationFn: async ({ osId, status }: { osId: string; status: string }) => {
       const updates: any = { status };
@@ -197,7 +180,7 @@ export const useOrdemServico = () => {
     },
   });
 
-  /** 👷‍♂️ ATRIBUIR EXECUTOR */
+  // ATRIBUIR EXECUTOR
   const assignExecutor = useMutation({
     mutationFn: async ({
       osId,
@@ -231,7 +214,7 @@ export const useOrdemServico = () => {
     },
   });
 
-  /** ✅ VALIDAR OS */
+  // VALIDAR OS
   const validateOS = useMutation({
     mutationFn: async ({
       osId,
