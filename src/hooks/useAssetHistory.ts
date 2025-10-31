@@ -1,19 +1,17 @@
+// src/hooks/useAssetHistory.ts
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCondominioId } from "./useCondominioId";
 
-export const useAssetHistory = (ativoId?: string, limit?: number) => {
-  const { condominioId } = useCondominioId();
-
+export function useAssetHistory(ativoId?: string, limit?: number) {
   return useQuery({
-    queryKey: ["asset-history", condominioId, ativoId, limit],
-    enabled: !!ativoId && !!condominioId,
+    queryKey: ["asset-history", ativoId, limit],
     queryFn: async () => {
-      if (!ativoId || !condominioId) return { data: [], count: 0 };
+      if (!ativoId) return { data: [], count: 0 };
 
       let query = supabase
         .from("os")
-        .select(`
+        .select(
+          `
           id,
           numero,
           titulo,
@@ -23,11 +21,12 @@ export const useAssetHistory = (ativoId?: string, limit?: number) => {
           data_conclusao,
           origem,
           prioridade,
-          executante:usuarios!os_executante_id_fkey(id, nome),
-          plano:planos_manutencao!os_plano_id_fkey(id, titulo, periodicidade)
-        `, { count: "exact" })
+          executante:executante_id(nome),
+          plano:plano_id(titulo, periodicidade)
+        `,
+          { count: "exact" }
+        )
         .eq("ativo_id", ativoId)
-        .eq("condominio_id", condominioId)
         .order("data_abertura", { ascending: false });
 
       if (limit) query = query.limit(limit);
@@ -36,5 +35,6 @@ export const useAssetHistory = (ativoId?: string, limit?: number) => {
       if (error) throw error;
       return { data: data ?? [], count: count ?? 0 };
     },
+    enabled: !!ativoId,
   });
-};
+}
