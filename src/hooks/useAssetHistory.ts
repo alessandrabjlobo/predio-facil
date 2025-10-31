@@ -13,8 +13,7 @@ export const useAssetHistory = (ativoId?: string, limit?: number) => {
 
       let query = supabase
         .from("os")
-        .select(
-          `
+        .select(`
           id,
           numero,
           titulo,
@@ -24,21 +23,17 @@ export const useAssetHistory = (ativoId?: string, limit?: number) => {
           data_conclusao,
           origem,
           prioridade,
-          -- relacionamentos explícitos como você já usa nos outros hooks:
           executante:usuarios!os_executante_id_fkey(id, nome),
           plano:planos_manutencao!os_plano_id_fkey(id, titulo, periodicidade)
-        `,
-          { count: "exact" }
-        )
+        `, { count: "exact" })
         .eq("ativo_id", ativoId)
-        .eq("condominio_id", condominioId) // <<< isolamento por condomínio
+        .eq("condominio_id", condominioId)
         .order("data_abertura", { ascending: false });
 
       if (limit) query = query.limit(limit);
 
       const { data, error, count } = await query;
       if (error) throw error;
-
       return { data: data ?? [], count: count ?? 0 };
     },
   });
