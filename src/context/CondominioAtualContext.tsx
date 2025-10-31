@@ -1,5 +1,7 @@
+// src/context/CondominioAtualContext.tsx
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 
 type Condominio = {
   id: string;
@@ -22,35 +24,40 @@ type Ctx = {
 };
 
 const CondominioAtualContext = createContext<Ctx | null>(null);
-const STORAGE_KEY = "condominioAtualId";
 
 export function CondominioAtualProvider({ children }: { children: React.ReactNode }) {
   const [lista, setLista] = useState<Condominio[]>([]);
-  const [condominioAtualId, setCondominioAtualIdState] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [condominioAtualId, setCondominioAtualIdState] = useState<string | null>(
+    getCurrentCondominioId()
+  );
+  const [loading, setLoading] = useState<boolean>(!getCurrentCondominioId());
   const [error, setError] = useState<string | null>(null);
 
-  // aplica mudança + persiste
+  // setter unificado: atualiza estado, persiste e avisa o app
   function setCondominioAtualId(id: string | null) {
     setCondominioAtualIdState(id);
-    if (id) localStorage.setItem(STORAGE_KEY, id);
-    else localStorage.removeItem(STORAGE_KEY);
+    if (id) setCurrentCondominioId(id);
+    else setCurrentCondominioId("");
+    // dispara evento global para os hooks ouvirem e refetcharem
+    window.dispatchEvent(new Event("condominio:changed"));
   }
 
+  // Carrega lista do usuário e decide seleção inicial
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Usuário não autenticado.");
+        const { data: auth } = await supabase.auth.getUser();
+        const authId = auth?.user?.id;
+        if (!authId) throw new Error("Usuário não autenticado.");
 
-        // pega usuario.id em "usuarios"
+        // pega usuarios.id
         const { data: usuario, error: eUsuario } = await supabase
           .from("usuarios")
           .select("id")
-          .eq("auth_user_id", user.id)
+          .eq("auth_user_id", authId)
           .maybeSingle();
         if (eUsuario) throw eUsuario;
         if (!usuario?.id) throw new Error("Perfil de usuário não encontrado.");
@@ -69,24 +76,24 @@ export function CondominioAtualProvider({ children }: { children: React.ReactNod
         if (!mounted) return;
         setLista(listaConds);
 
-        // decide seleção:
-        // 1) se há storage e ainda faz parte da lista, usa
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored && listaConds.some((c) => c.id === stored)) {
-          setCondominioAtualIdState(stored);
-        } else {
-          // 2) senão, usa principal
-          const principal = (rels ?? []).find((r: UCRow) => r.is_principal);
-          if (principal?.condominio_id && listaConds.some((c) => c.id === principal.condominio_id)) {
-            setCondominioAtualIdState(principal.condominio_id);
-            localStorage.setItem(STORAGE_KEY, principal.condominio_id);
-          } else {
-            // 3) senão, primeiro da lista ou null
-            const first = listaConds[0]?.id ?? null;
-            setCondominioAtualIdState(first);
-            if (first) localStorage.setItem(STORAGE_KEY, first);
-          }
+        // Seleção:
+        // 1) usa o salvo (se ainda fizer parte da lista)
+        const saved = getCurrentCondominioId();
+        if (saved && listaConds.some((c) => c.id === saved)) {
+          setCondominioAtualIdState(saved);
+          return;
         }
+
+        // 2) senão, usa principal
+        const principal = (rels ?? []).find((r: UCRow) => r.is_principal);
+        if (principal?.condominio_id && listaConds.some((c) => c.id === principal.condominio_id)) {
+          setCondominioAtualId(principal.condominio_id);
+          return;
+        }
+
+        // 3) senão, primeiro da lista (ou null)
+        const first = listaConds[0]?.id ?? null;
+        setCondominioAtualId(first ?? null);
       } catch (e: any) {
         if (!mounted) return;
         setError(e?.message ?? "Erro ao carregar condomínios do usuário.");
@@ -94,7 +101,24 @@ export function CondominioAtualProvider({ children }: { children: React.ReactNod
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Mantém o contexto sincronizado com mudanças externas (Switcher, outras abas)
+  useEffect(() => {
+    const sync = () => setCondominioAtualIdState(getCurrentCondominioId());
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "currentCondominioId") sync();
+    };
+    window.addEventListener("condominio:changed", sync);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("condominio:changed", sync);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   const condominioAtual = useMemo(
