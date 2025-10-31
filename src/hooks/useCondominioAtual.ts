@@ -1,55 +1,35 @@
 // src/hooks/useCondominioAtual.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { getCurrentCondominioId, setCurrentCondominioId } from "@/lib/tenant";
 
-interface Condominio {
+export interface Condominio {
   id: string;
   nome: string;
   endereco: string | null;
 }
 
-const LS_ID = "condominioAtualId";
-const LS_NOME = "condominioAtualNome";
-
 export const useCondominioAtual = () => {
   const { user } = useAuth();
   const [condominio, setCondominio] = useState<Condominio | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const selecionar = useCallback((id: string, nome: string) => {
-    localStorage.setItem(LS_ID, id);
-    localStorage.setItem(LS_NOME, nome);
-    setCondominio({ id, nome, endereco: null }); // endereco pode ser carregado depois
-  }, []);
-
-  const limpar = useCallback(() => {
-    localStorage.removeItem(LS_ID);
-    localStorage.removeItem(LS_NOME);
-    setCondominio(null);
-  }, []);
+  const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    let vivo = true;
+    let ativo = true;
 
-    const boot = async () => {
+    (async () => {
       setLoading(true);
+      setErro(null);
 
       try {
-        // 1) Se houver override em localStorage, use já (UX imediato)
-        const lsId = localStorage.getItem(LS_ID);
-        const lsNome = localStorage.getItem(LS_NOME);
-        if (lsId && lsNome) {
-          if (vivo) setCondominio({ id: lsId, nome: lsNome, endereco: null });
-        }
-
-        // 2) Se não logado: encerra
         if (!user) {
-          if (vivo) setLoading(false);
+          if (ativo) { setCondominio(null); setLoading(false); }
           return;
         }
 
-        // 3) Busca o id do usuário (public.usuarios) pelo auth_user_id
+        // 1) pega usuarios.id a partir do auth_user_id
         const { data: usuario, error: eUser } = await supabase
           .from("usuarios")
           .select("id")
@@ -57,54 +37,67 @@ export const useCondominioAtual = () => {
           .single();
 
         if (eUser || !usuario) {
-          if (vivo) setLoading(false);
+          if (ativo) setCondominio(null);
           return;
         }
 
-        // 4) Tenta pegar o principal do banco
-        const { data: uc, error: eUc } = await supabase
+        // 2) lista todos os condomínios do usuário (ordena p/ trazer o principal primeiro)
+        const { data: rels, error: eRels } = await supabase
           .from("usuarios_condominios")
-          .select("condominio_id, condominios(id, nome, endereco)")
+          .select("condominio_id, is_principal, condominios(id, nome, endereco)")
           .eq("usuario_id", usuario.id)
-          .eq("is_principal", true)
-          .maybeSingle();
+          .order("is_principal", { ascending: false })
+          .order("created_at", { ascending: true });
 
-        if (!vivo) return;
+        if (eRels) throw eRels;
 
-        if (!eUc && uc?.condominios) {
-          const c = uc.condominios as unknown as Condominio;
+        const lista = (rels ?? []).map((r: any) => ({
+          id: r.condominios?.id ?? r.condominio_id,
+          nome: r.condominios?.nome ?? "Condomínio",
+          endereco: r.condominios?.endereco ?? null,
+          is_principal: !!r.is_principal,
+        }));
 
-          // Se NÃO havia override, grava o principal no estado e sincroniza no LS
-          if (!lsId || !lsNome) {
-            localStorage.setItem(LS_ID, c.id);
-            localStorage.setItem(LS_NOME, c.nome);
-            setCondominio(c);
-          } else {
-            // Havia override: mantém a escolha do usuário,
-            // mas se o endereço vier do banco e for o mesmo id, atualize o campo
-            if (condominio?.id === c.id) {
-              setCondominio(c);
-            }
-          }
+        if (!ativo) return;
+
+        // 3) tenta usar o salvo no localStorage
+        const salvoId = getCurrentCondominioId();
+        let escolhido =
+          (salvoId && lista.find((c) => c.id === salvoId)) ||
+          lista[0] ||
+          null; // primeiro é o principal por causa da ordenação
+
+        if (escolhido) {
+          // garante que o localStorage ficou coerente
+          if (salvoId !== escolhido.id) setCurrentCondominioId(escolhido.id);
+          setCondominio({
+            id: escolhido.id,
+            nome: escolhido.nome,
+            endereco: escolhido.endereco,
+          });
         } else {
-          // Não há principal no banco → se também não havia override, fica null
-          if (!lsId || !lsNome) {
-            setCondominio(null);
-          }
+          setCondominio(null);
         }
-      } catch (err) {
-        console.error("Erro ao buscar condomínio:", err);
+      } catch (e: any) {
+        if (ativo) setErro(e?.message ?? "Falha ao buscar condomínio");
       } finally {
-        if (vivo) setLoading(false);
+        if (ativo) setLoading(false);
       }
-    };
+    })();
 
-    boot();
-    return () => {
-      vivo = false;
+    // permite “avisar” o app que o condomínio mudou (dispatcher no Switcher)
+    const onChanged = () => {
+      // força nova leitura
+      setLoading(true);
+      setTimeout(() => setLoading(false), 0);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.addEventListener("condominio:changed", onChanged);
+
+    return () => {
+      ativo = false;
+      window.removeEventListener("condominio:changed", onChanged);
+    };
   }, [user]);
 
-  return { condominio, loading, selecionar, limpar };
+  return { condominio, loading, erro };
 };
