@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useAssetHistory(ativoId?: string, limit?: number) {
+export const useAssetHistory = (ativoId?: string, limit?: number) => {
   return useQuery({
     queryKey: ["asset-history", ativoId, limit],
     queryFn: async () => {
@@ -33,8 +33,9 @@ export function useAssetHistory(ativoId?: string, limit?: number) {
 
       const { data, error, count } = await query;
       if (error) throw error;
-      return { data: data ?? [], count: count ?? 0 };
+
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!ativoId,
   });
-}
+};
