@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { useCondominioId } from "./useCondominioId"; // <— novo hook
+import { useCondominioId } from "./useCondominioId";
 
 export const useChamados = () => {
   const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
   const { data: chamados, isLoading } = useQuery({
-    queryKey: ["chamados", condominioId],         // <— chave depende do condo
+    queryKey: ["chamados", condominioId],
     enabled: !!condominioId,
     queryFn: async () => {
       if (!condominioId) return [];
