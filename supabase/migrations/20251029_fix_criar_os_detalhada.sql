@@ -1,134 +1,80 @@
--- ==========================================
--- 🔧 MIGRATION: Fix criar_os_detalhada
--- DATA: 2025-10-29
--- OBJETIVO: Corrigir a função RPC criar_os_detalhada
--- ==========================================
+-- ===========================================
+-- DROP das variações conhecidas para evitar 42P13
+-- ===========================================
+drop function if exists public.criar_os_detalhada(uuid, uuid, uuid, text, uuid, text, text, text, date);
+drop function if exists public.criar_os_detalhada(uuid, uuid, uuid, text, uuid, text, text, text, timestamp with time zone);
+drop function if exists public.criar_os_detalhada(uuid, uuid, uuid, text, uuid, text, text, text);
 
--- Remove versões antigas da função
-DROP FUNCTION IF EXISTS public.criar_os_detalhada;
-
--- ==========================================
--- ✅ FUNÇÃO CORRIGIDA
--- ==========================================
-CREATE OR REPLACE FUNCTION public.criar_os_detalhada(
-  p_condominio_id uuid,
-  p_plano_id uuid DEFAULT NULL,
-  p_ativo_id uuid,
-  p_responsavel_id uuid,
-  p_titulo text,
-  p_descricao text DEFAULT '',
-  p_prioridade text DEFAULT 'media',
-  p_tipo_os text DEFAULT 'preventiva',
-  p_data_prevista date DEFAULT NULL
+-- ===========================================
+-- (RE)CRIAR VERSÃO OFICIAL (SEM DEFAULTS)
+-- ===========================================
+create or replace function public.criar_os_detalhada(
+  p_condominio_id   uuid,
+  p_ativo_id        uuid,
+  p_responsavel_id  uuid,
+  p_titulo          text,
+  p_solicitante_id  uuid,
+  p_descricao       text,
+  p_prioridade      text,
+  p_status          text,
+  p_data_execucao   date
 )
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_os_id uuid;
-  v_numero integer;
-  v_checklist jsonb;
-  v_data_abertura timestamp := now();
-  v_sla_vencimento date;
-BEGIN
-  -- =====================================================
-  -- 1️⃣ Validações iniciais
-  -- =====================================================
-  IF p_condominio_id IS NULL THEN
-    RAISE EXCEPTION 'Condomínio não informado';
-  END IF;
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_os_id   uuid;
+  v_numero  text;
+begin
+  -- Gerar número da OS usando generate_os_numero(condominio_id) se existir
+  begin
+    select generate_os_numero(p_condominio_id) into v_numero;
+  exception
+    when undefined_function then
+      v_numero := 'OS-'||to_char(now(),'YYYYMMDD')||'-'||lpad((floor(random()*9999))::int::text, 4, '0');
+  end;
 
-  IF p_ativo_id IS NULL THEN
-    RAISE EXCEPTION 'Ativo não informado';
-  END IF;
-
-  -- =====================================================
-  -- 2️⃣ Geração do número sequencial da OS
-  -- =====================================================
-  SELECT COALESCE(MAX(numero), 0) + 1 INTO v_numero
-  FROM os
-  WHERE condominio_id = p_condominio_id;
-
-  -- =====================================================
-  -- 3️⃣ Determinar prazo de vencimento (30 dias padrão)
-  -- =====================================================
-  v_sla_vencimento := COALESCE(p_data_prevista, (current_date + interval '30 days'));
-
-  -- =====================================================
-  -- 4️⃣ Buscar checklist do plano, se existir
-  -- =====================================================
-  IF p_plano_id IS NOT NULL THEN
-    SELECT checklist INTO v_checklist
-    FROM planos_manutencao
-    WHERE id = p_plano_id;
-  ELSE
-    v_checklist := '[]'::jsonb;
-  END IF;
-
-  -- =====================================================
-  -- 5️⃣ Inserir OS na tabela principal
-  -- =====================================================
-  INSERT INTO os (
-    id,
+  insert into public.os (
     condominio_id,
-    numero,
+    ativo_id,
+    responsavel_id,
+    solicitante_id,
     titulo,
     descricao,
-    status,
-    origem,
     prioridade,
-    ativo_id,
-    plano_id,
-    solicitante_id,
-    data_abertura,
-    data_prevista,
-    sla_vencimento,
-    checklist
-  )
-  VALUES (
-    gen_random_uuid(),
+    status,
+    data_execucao,
+    numero
+  ) values (
     p_condominio_id,
-    v_numero,
+    p_ativo_id,
+    p_responsavel_id,
+    p_solicitante_id,
     p_titulo,
     p_descricao,
-    'aberta',
-    p_tipo_os,
     p_prioridade,
-    p_ativo_id,
-    p_plano_id,
-    p_responsavel_id,
-    v_data_abertura,
-    p_data_prevista,
-    v_sla_vencimento,
-    v_checklist
+    p_status,
+    p_data_execucao,
+    v_numero
   )
-  RETURNING id INTO v_os_id;
+  returning id into v_os_id;
 
-  -- =====================================================
-  -- 6️⃣ Retorno em formato JSON
-  -- =====================================================
-  RETURN jsonb_build_object(
-    'success', true,
-    'message', 'Ordem de Serviço criada com sucesso',
-    'os_id', v_os_id,
-    'numero', v_numero,
-    'condominio_id', p_condominio_id,
-    'ativo_id', p_ativo_id,
-    'plano_id', p_plano_id
-  );
+  -- Log inicial (ignora se a tabela não existir)
+  begin
+    insert into public.os_logs(os_id, usuario_id, acao, observacoes)
+    values (v_os_id, p_solicitante_id, 'criada', coalesce('OS criada: '||p_titulo, 'OS criada'));
+  exception
+    when undefined_table or undefined_column then
+      -- segue sem travar
+      null;
+  end;
 
-EXCEPTION
-  WHEN OTHERS THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', SQLERRM,
-      'message', 'Falha ao criar Ordem de Serviço'
-    );
-END;
+  return v_os_id;
+end;
 $$;
 
--- ==========================================
--- 🧩 PERMISSÕES
--- ==========================================
-GRANT EXECUTE ON FUNCTION public.criar_os_detalhada TO anon, authenticated, service_role;
+-- Permissões de execução da função
+grant execute on function public.criar_os_detalhada(uuid, uuid, uuid, text, uuid, text, text, text, date)
+to authenticated, anon;
