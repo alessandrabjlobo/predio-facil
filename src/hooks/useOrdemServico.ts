@@ -6,7 +6,8 @@ import { useCondominioId } from "./useCondominioId";
 
 type ChecklistItem = {
   id?: string;
-  titulo: string;
+  titulo?: string;
+  item?: string;
   descricao?: string;
   obrigatorio?: boolean;
   ok?: boolean;
@@ -17,9 +18,7 @@ export const useOrdemServico = () => {
   const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
-  /**
-   * 🔎 LISTAGEM – agora trazendo checklist e campos “ricos”
-   */
+  // LISTAGEM (traz checklist + campos “ricos”)
   const { data: ordens, isLoading } = useQuery({
     queryKey: ["ordens-servico", condominioId],
     enabled: !!condominioId,
@@ -50,7 +49,7 @@ export const useOrdemServico = () => {
           centro_custo,
           pdf_path,
           checklist,
-          ativo:ativos(id, nome, tipo_id),
+          ativo:ativos(id, nome, tipo_id, local),
           plano:planos_manutencao(id, titulo, tipo, checklist),
           solicitante:usuarios!os_solicitante_id_fkey(id, nome),
           executante:usuarios!os_executante_id_fkey(id, nome)
@@ -63,25 +62,23 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 🧱 CRIAÇÃO – monta checklist e campos derivados no front (funciona já, mesmo sem RPC)
-   */
+  // CRIAÇÃO (RPC se existir; fallback por INSERT garantindo checklist)
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
       ativoId,
       titulo,
       descricao,
-      tipo = "preventiva",                   // 'preventiva' | 'corretiva'
+      tipo = "preventiva",
       prioridade = "media",
-      dataPrevista,                          // string (YYYY-MM-DD) opcional
-      tipoExecutor = "externo",              // 'interno' | 'externo'
+      dataPrevista,
+      tipoExecutor = "externo",
       executorNome,
       executorContato,
       custoPrevisto,
       centroCusto,
       local,
-      checklistCustom,                       // se quiser forçar um checklist no ato
+      checklistCustom,
     }: {
       planoId?: string;
       ativoId: string;
@@ -89,7 +86,7 @@ export const useOrdemServico = () => {
       descricao?: string;
       tipo?: "preventiva" | "corretiva" | string;
       prioridade?: string;
-      dataPrevista?: string;
+      dataPrevista?: string; // YYYY-MM-DD
       tipoExecutor?: "interno" | "externo" | string;
       executorNome?: string;
       executorContato?: string;
@@ -100,22 +97,20 @@ export const useOrdemServico = () => {
     }) => {
       if (!condominioId) throw new Error("Condomínio não encontrado");
 
-      // Usuário autenticado -> pega usuarios.id (solicitante)
+      // pega usuarios.id do auth atual
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      const { data: usuario } = await supabase
+      const { data: usuario, error: eUsuario } = await supabase
         .from("usuarios")
         .select("id")
         .eq("auth_user_id", user.id)
         .single();
+      if (eUsuario || !usuario?.id) throw new Error("Usuário não encontrado");
 
-      if (!usuario?.id) throw new Error("Usuário não encontrado");
-
-      // 1) Monta checklist: prioridade é plano > custom > tipo do ativo
+      // 1) Resolver checklist: plano -> custom -> tipo do ativo
       let checklist: ChecklistItem[] = [];
 
-      // 1a. Se houver plano, usa checklist do plano
       if (planoId) {
         const { data: plano } = await supabase
           .from("planos_manutencao")
@@ -127,53 +122,45 @@ export const useOrdemServico = () => {
         }
       }
 
-      // 1b. Se não veio do plano e foi passado um custom, usa-o
       if (!checklist?.length && checklistCustom?.length) {
         checklist = checklistCustom;
       }
 
-      // 1c. Se ainda vazio, tenta checklist_default do tipo do ativo
       if (!checklist?.length) {
-        // busca tipo do ativo -> ativo_tipos.checklist_default
         const { data: ativo } = await supabase
           .from("ativos")
           .select("tipo_id")
           .eq("id", ativoId)
           .maybeSingle();
-
         if (ativo?.tipo_id) {
           const { data: tipoAtivo } = await supabase
             .from("ativo_tipos")
             .select("checklist_default")
             .eq("id", ativo.tipo_id)
             .maybeSingle();
-
           if (tipoAtivo?.checklist_default && Array.isArray(tipoAtivo.checklist_default)) {
             checklist = tipoAtivo.checklist_default as ChecklistItem[];
           }
         }
       }
 
-      // 2) SLA: se dataPrevista não vier, considera 30 dias
+      // 2) SLA default (30 dias) se não vier dataPrevista
       const hoje = new Date();
-      const defaultVenc = new Date(hoje);
-      defaultVenc.setDate(defaultVenc.getDate() + 30);
-      const slaVencimento = dataPrevista
-        ? dataPrevista
-        : defaultVenc.toISOString().slice(0, 10); // YYYY-MM-DD
+      const d = new Date(hoje);
+      d.setDate(d.getDate() + 30);
+      const slaVencimento = dataPrevista ?? d.toISOString().slice(0, 10);
 
-      // 3) Mapeia origem válida no seu enum (preventiva|corretiva)
+      // 3) Origem válida: preventiva | corretiva
       const origem = (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva";
 
-      // 4) Tenta RPC (se existir com essa assinatura). Se não, cai no INSERT.
+      // 4) Tentar RPC (se existir com alguma assinatura compatível)
       const tryRpc = await supabase.rpc("criar_os_detalhada", {
-        // nomes que algumas versões suas esperam:
         p_condominio_id: condominioId,
         p_ativo_id: ativoId,
         p_titulo: titulo,
         p_plano_id: planoId ?? null,
         p_descricao: descricao ?? "",
-        p_tipo_manutencao: origem,             // em algumas versões é p_tipo_os
+        p_tipo_manutencao: origem,             // ou p_tipo_os em versões antigas
         p_prioridade: prioridade ?? "media",
         p_tipo_executor: tipoExecutor ?? "externo",
         p_executor_nome: executorNome ?? null,
@@ -187,7 +174,7 @@ export const useOrdemServico = () => {
         return tryRpc.data; // sucesso via RPC
       }
 
-      // Fallback 100% compatível com seu schema
+      // 5) Fallback: INSERT direto (campos existentes no seu schema)
       const { data, error } = await supabase
         .from("os")
         .insert({
@@ -230,9 +217,7 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 🔄 ATUALIZAR STATUS
-   */
+  // ATUALIZAR STATUS
   const updateOSStatus = useMutation({
     mutationFn: async ({ osId, status }: { osId: string; status: string }) => {
       const updates: any = { status };
@@ -263,15 +248,10 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 👷 ATRIBUIR EXECUTOR
-   */
+  // ATRIBUIR EXECUTOR
   const assignExecutor = useMutation({
-    mutationFn: async ({
-      osId,
-      executorNome,
-      executorContato,
-    }: { osId: string; executorNome: string; executorContato: string }) => {
+    mutationFn: async ({ osId, executorNome, executorContato }:
+      { osId: string; executorNome: string; executorContato: string }) => {
       const { data, error } = await supabase
         .from("os")
         .update({
@@ -299,15 +279,10 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * ✅ VALIDAR OS
-   */
+  // VALIDAR OS
   const validateOS = useMutation({
-    mutationFn: async ({
-      osId,
-      aprovado,
-      observacoes,
-    }: { osId: string; aprovado: boolean; observacoes?: string }) => {
+    mutationFn: async ({ osId, aprovado, observacoes }:
+      { osId: string; aprovado: boolean; observacoes?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
