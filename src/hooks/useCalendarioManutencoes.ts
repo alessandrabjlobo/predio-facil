@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCondominioAtual } from "./useCondominioAtual";
+import { useCondominioId } from "./useCondominioId";
 
 export interface EventoCalendario {
   id: string;
   titulo: string;
-  data_evento: string;
+  data_evento: string; // ISO
   tipo: string;
   periodicidade: string;
   ativo_nome: string;
@@ -17,54 +17,71 @@ export interface EventoCalendario {
 }
 
 export const useCalendarioManutencoes = () => {
-  const { condominio } = useCondominioAtual();
+  const { condominioId } = useCondominioId();
 
   const { data: eventos, isLoading } = useQuery({
-    queryKey: ["calendario-manutencoes", condominio?.id],
+    queryKey: ["calendario-manutencoes", condominioId],
+    enabled: !!condominioId,
     queryFn: async () => {
+      if (!condominioId) return [] as EventoCalendario[];
+
       const { data, error } = await supabase
         .from("calendario_manutencoes")
         .select("*")
-        .eq("condominio_id", condominio?.id)
+        .eq("condominio_id", condominioId)
         .order("data_evento", { ascending: true });
 
       if (error) throw error;
-      return data as EventoCalendario[];
+      return (data ?? []) as EventoCalendario[];
     },
-    enabled: !!condominio?.id,
   });
 
-  // KPIs
-  const kpis = {
-    totalMes: eventos?.filter(e => {
-      const data = new Date(e.data_evento);
-      const hoje = new Date();
-      return data.getMonth() === hoje.getMonth() && data.getFullYear() === hoje.getFullYear();
-    }).length || 0,
-    
-    atrasadas: eventos?.filter(e => e.status_visual === "atrasado").length || 0,
-    
-    proximos7Dias: eventos?.filter(e => e.status_visual === "iminente").length || 0,
-    
-    taxaConformidade: eventos && eventos.length > 0
-      ? Math.round((eventos.filter(e => e.status_visual === "executado").length / eventos.length) * 100)
-      : 0,
-  };
+  // ---- KPIs (client-side) ----
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth();
+  const anoAtual = hoje.getFullYear();
 
-  // Próximas manutenções (próximos 7 dias)
-  const proximasManutencoes = eventos
-    ?.filter(e => ["iminente", "agendado"].includes(e.status_visual))
-    .slice(0, 5) || [];
+  const totalMes =
+    eventos?.filter((e) => {
+      const d = new Date(e.data_evento);
+      return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
+    }).length ?? 0;
 
-  // Alertas críticos
-  const alertasCriticos = eventos
-    ?.filter(e => e.status_visual === "atrasado" && e.requer_conformidade)
-    .slice(0, 5) || [];
+  const atrasadas = eventos?.filter((e) => e.status_visual === "atrasado").length ?? 0;
+
+  const proximos7Dias =
+    eventos?.filter((e) => e.status_visual === "iminente").length ?? 0;
+
+  const taxaConformidade =
+    eventos && eventos.length > 0
+      ? Math.round(
+          (eventos.filter((e) => e.status_visual === "executado").length /
+            eventos.length) *
+            100
+        )
+      : 0;
+
+  // Próximas manutenções (limit 5) — iminentes ou agendadas
+  const proximasManutencoes =
+    eventos
+      ?.filter((e) => ["iminente", "agendado"].includes(e.status_visual))
+      .slice(0, 5) ?? [];
+
+  // Alertas críticos (limit 5) — atrasadas e que exigem conformidade
+  const alertasCriticos =
+    eventos
+      ?.filter((e) => e.status_visual === "atrasado" && e.requer_conformidade)
+      .slice(0, 5) ?? [];
 
   return {
-    eventos: eventos || [],
+    eventos: eventos ?? [],
     isLoading,
-    kpis,
+    kpis: {
+      totalMes,
+      atrasadas,
+      proximos7Dias,
+      taxaConformidade,
+    },
     proximasManutencoes,
     alertasCriticos,
   };
