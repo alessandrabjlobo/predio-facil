@@ -46,7 +46,7 @@ export const useOrdemServico = () => {
     },
   });
 
-  // CRIAÇÃO (RPC com fallback)
+  // CRIAÇÃO (RPC estável com fallback)
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
@@ -67,6 +67,7 @@ export const useOrdemServico = () => {
     }) => {
       if (!condominioId) throw new Error("Condomínio não encontrado");
 
+      // usuário autenticado -> pega usuarios.id
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -75,11 +76,14 @@ export const useOrdemServico = () => {
         .select("id")
         .eq("auth_user_id", user.id)
         .single();
-
       if (eUsuario || !usuario?.id) throw new Error("Usuário não encontrado");
 
-      // tenta RPC (nome único e assinatura estável no banco)
-      const rpc = await supabase.rpc("criar_os_detalhada", {
+      // Normaliza tipo p/ enum permitido na coluna "origem"
+      const origemNormalizada =
+        tipo === "preventiva" || tipo === "corretiva" ? tipo : "corretiva";
+
+      // 1) Tenta RPC estável `os_create`
+      const rpc = await supabase.rpc("os_create", {
         p_condominio_id: condominioId,
         p_ativo_id: ativoId,
         p_responsavel_id: usuario.id,
@@ -87,31 +91,31 @@ export const useOrdemServico = () => {
         p_plano_id: planoId ?? null,
         p_descricao: descricao ?? "",
         p_prioridade: prioridade ?? "media",
-        p_tipo_os: (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva",
+        p_tipo_os: origemNormalizada, // mapeia para 'preventiva' | 'corretiva'
         p_data_prevista: dataPrevista ?? null,
       });
 
       if (!rpc.error) {
-        // retorna o UUID da OS criada (conforme função SQL)
+        // A RPC retorna os dados da OS criada (ou pelo menos o id/numero)
         return rpc.data;
       }
 
-      // Se a RPC não existe/exposta, cai pro fallback
+      // 2) Se a RPC não existe/exposta, faz FALLBACK para INSERT
       const msg = rpc.error.message?.toLowerCase() ?? "";
       const isMissing =
-        (rpc as any).status === 404 ||
+        // alguns clientes retornam status em outra prop; protegemos por mensagem
         msg.includes("not found") ||
         msg.includes("does not exist") ||
         (msg.includes("function") && msg.includes("does not exist"));
 
       if (!isMissing) {
-        console.error("❌ Erro RPC criar_os_detalhada:", rpc.error);
+        console.error("❌ Erro RPC os_create:", rpc.error);
         throw new Error(rpc.error.message || "Erro ao criar OS (RPC)");
       }
 
       console.warn("↩️ RPC ausente: usando fallback INSERT em public.os");
 
-      // Fallback corrigido: status e colunas válidas
+      // Fallback: usa somente colunas/valores válidos do schema atual
       const { data, error } = await supabase
         .from("os")
         .insert({
@@ -120,12 +124,12 @@ export const useOrdemServico = () => {
           ativo_id: ativoId,
           titulo,
           descricao: descricao ?? "",
-          status: "aberta", // <-- válido no teu enum
+          status: "aberta", // enum válido no teu schema
           prioridade: prioridade ?? "media",
-          origem: (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva", // <-- mapeia corretamente
+          origem: origemNormalizada, // 'preventiva' | 'corretiva'
           data_abertura: new Date().toISOString(),
           data_prevista: dataPrevista ?? null,
-          // NADA de "tipo_os": essa coluna não existe no schema
+          // não enviar campos que não existem (ex.: tipo_os)
         })
         .select()
         .single();
