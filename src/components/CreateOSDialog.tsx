@@ -1,21 +1,14 @@
+// src/components/CreateOSDialog.tsx
 import { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Calendar } from "@/components/ui/calendar";
@@ -49,37 +42,41 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
   const [descricao, setDescricao] = useState("");
   const [tipo, setTipo] = useState(initialData?.tipo || "preventiva");
   const [prioridade, setPrioridade] = useState("media");
-  const [ativoId, setAtivoId] = useState(initialData?.ativoId || ""); // manter como string
+  const [ativoId, setAtivoId] = useState(initialData?.ativoId || "");
   const [dataPrevista, setDataPrevista] = useState<Date | undefined>(
     initialData?.dataPrevista ? new Date(initialData.dataPrevista) : undefined
   );
   const [slaDias, setSlaDias] = useState("30");
+
+  const [centroCusto, setCentroCusto] = useState("");
+  const [local, setLocal] = useState("");
+  const [custoPrevisto, setCustoPrevisto] = useState("");
+
   const [tipoExecutor, setTipoExecutor] = useState<"interno" | "externo">("interno");
-  const [executanteId, setExecutanteId] = useState(""); // string
+  const [executanteId, setExecutanteId] = useState("");
   const [executorNome, setExecutorNome] = useState("");
   const [executorContato, setExecutorContato] = useState("");
-  const [executorEmpresa, setExecutorEmpresa] = useState("");
-  const [executorCnpj, setExecutorCnpj] = useState("");
-  const [custoPrevisto, setCustoPrevisto] = useState("");
 
   const handleSubmit = async () => {
     if (!titulo || !ativoId) return;
 
-    // comparar ids como string pra evitar bugs entre number/string
-    const ativo = ativos?.find((a: any) => String(a.id) === String(ativoId));
-
-    // UMA ÚNICA chamada ao mutateAsync (antes tinham duas)
     await createOS.mutateAsync({
-  titulo,
-  descricao,
-  ativoId, // string
-  planoId: initialData?.planoId,
-  tipo,
-  prioridade,
-  dataPrevista: dataPrevista?.toISOString().split("T")[0],
-  slaDias: parseInt(slaDias || "0", 10),
-});
-
+      titulo,
+      descricao,
+      ativoId,
+      planoId: initialData?.planoId,
+      tipo,
+      prioridade,
+      dataPrevista: dataPrevista?.toISOString().split("T")[0],
+      slaDias: parseInt(slaDias || "0", 10),
+      tipoExecutor,
+      executanteId: tipoExecutor === "interno" ? executanteId || undefined : undefined,
+      executorNome:  tipoExecutor === "externo" ? executorNome  || undefined : undefined,
+      executorContato: tipoExecutor === "externo" ? executorContato || undefined : undefined,
+      centroCusto: centroCusto || undefined,
+      local: local || undefined,
+      custoPrevisto: custoPrevisto ? Number(custoPrevisto) : undefined,
+    });
 
     onOpenChange(false);
     resetForm();
@@ -93,13 +90,13 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
     setAtivoId("");
     setDataPrevista(undefined);
     setSlaDias("30");
+    setCentroCusto("");
+    setLocal("");
+    setCustoPrevisto("");
     setTipoExecutor("interno");
     setExecutanteId("");
     setExecutorNome("");
     setExecutorContato("");
-    setExecutorEmpresa("");
-    setExecutorCnpj("");
-    setCustoPrevisto("");
   };
 
   return (
@@ -141,6 +138,7 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
                 <SelectContent>
                   <SelectItem value="preventiva">Preventiva</SelectItem>
                   <SelectItem value="corretiva">Corretiva</SelectItem>
+                  {/* 'emergencial' não existe no enum 'origem'; se escolher, o hook mapeia para 'corretiva' */}
                   <SelectItem value="emergencial">Emergencial</SelectItem>
                 </SelectContent>
               </Select>
@@ -169,8 +167,8 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
                 <SelectValue placeholder="Selecione o ativo" />
               </SelectTrigger>
               <SelectContent>
-                {ativos?.map((ativo: any, idx: number) => (
-                  <SelectItem key={`${ativo.id}-${idx}`} value={String(ativo.id)}>
+                {ativos?.map((ativo: any) => (
+                  <SelectItem key={String(ativo.id)} value={String(ativo.id)}>
                     {ativo.nome} {ativo.local && `- ${ativo.local}`}
                   </SelectItem>
                 ))}
@@ -212,24 +210,41 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
             </div>
           </div>
 
-          <div>
-            <Label htmlFor="custo">Custo Previsto (R$)</Label>
-            <Input
-              id="custo"
-              type="number"
-              step="0.01"
-              value={custoPrevisto}
-              onChange={(e) => setCustoPrevisto(e.target.value)}
-              placeholder="0.00"
-            />
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="centroCusto">Centro de Custo</Label>
+              <Input
+                id="centroCusto"
+                value={centroCusto}
+                onChange={(e) => setCentroCusto(e.target.value)}
+                placeholder="Ex.: Manutenção Predial"
+              />
+            </div>
+            <div>
+              <Label htmlFor="local">Local</Label>
+              <Input
+                id="local"
+                value={local}
+                onChange={(e) => setLocal(e.target.value)}
+                placeholder="Ex.: Bloco B - Garagem"
+              />
+            </div>
+            <div>
+              <Label htmlFor="custo">Custo Previsto (R$)</Label>
+              <Input
+                id="custo"
+                type="number"
+                step="0.01"
+                value={custoPrevisto}
+                onChange={(e) => setCustoPrevisto(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
           </div>
 
           <div className="space-y-3 border-t pt-4">
             <Label>Tipo de Executor *</Label>
-            <RadioGroup
-              value={tipoExecutor}
-              onValueChange={(v) => setTipoExecutor(v as "interno" | "externo")}
-            >
+            <RadioGroup value={tipoExecutor} onValueChange={(v) => setTipoExecutor(v as "interno" | "externo")}>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="interno" id="interno" />
                 <Label htmlFor="interno" className="font-normal cursor-pointer">
@@ -253,8 +268,8 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
                   <SelectValue placeholder="Selecione o responsável" />
                 </SelectTrigger>
                 <SelectContent>
-                  {zeladores?.map((z: any, idx: number) => (
-                    <SelectItem key={`${z.id}-${idx}`} value={String(z.id)}>
+                  {zeladores?.map((z: any) => (
+                    <SelectItem key={String(z.id)} value={String(z.id)}>
                       {z.nome}
                     </SelectItem>
                   ))}
@@ -262,47 +277,24 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
               </Select>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="empresa">Nome da Empresa *</Label>
-                  <Input
-                    id="empresa"
-                    value={executorEmpresa}
-                    onChange={(e) => setExecutorEmpresa(e.target.value)}
-                    placeholder="Razão social"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input
-                    id="cnpj"
-                    value={executorCnpj}
-                    onChange={(e) => setExecutorCnpj(e.target.value)}
-                    placeholder="00.000.000/0000-00"
-                    maxLength={18}
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="responsavel">Nome do Responsável *</Label>
+                <Input
+                  id="responsavel"
+                  value={executorNome}
+                  onChange={(e) => setExecutorNome(e.target.value)}
+                  placeholder="Nome completo"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="responsavel">Nome do Responsável *</Label>
-                  <Input
-                    id="responsavel"
-                    value={executorNome}
-                    onChange={(e) => setExecutorNome(e.target.value)}
-                    placeholder="Nome completo"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="contato">Contato *</Label>
-                  <Input
-                    id="contato"
-                    value={executorContato}
-                    onChange={(e) => setExecutorContato(e.target.value)}
-                    placeholder="(00) 00000-0000"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="contato">Contato *</Label>
+                <Input
+                  id="contato"
+                  value={executorContato}
+                  onChange={(e) => setExecutorContato(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
               </div>
             </div>
           )}
@@ -312,7 +304,7 @@ export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDial
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSubmit} disabled={createOS.isPending}>
+          <Button onClick={handleSubmit} disabled={createOS.isPending || !titulo || !ativoId}>
             {createOS.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Criar OS
           </Button>
