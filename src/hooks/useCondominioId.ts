@@ -1,45 +1,33 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useCondominioId } from "./useCondominioId";
+// src/hooks/useCondominioId.ts
+import { useEffect, useState } from "react";
 
-export const useAssetHistory = (ativoId?: string, limit?: number) => {
-  const { condominioId } = useCondominioId();
+const KEY = "currentCondominioId";
 
-  return useQuery({
-    queryKey: ["asset-history", condominioId, ativoId, limit],
-    enabled: !!ativoId && !!condominioId,
-    queryFn: async () => {
-      if (!ativoId || !condominioId) return { data: [], count: 0 };
+function getId(): string | null {
+  try {
+    return localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
 
-      let query = supabase
-        .from("os")
-        .select(
-          `
-          id,
-          numero,
-          titulo,
-          status,
-          status_validacao,
-          data_abertura,
-          data_conclusao,
-          origem,
-          prioridade,
-          -- relacionamentos explícitos como você já usa nos outros hooks:
-          executante:usuarios!os_executante_id_fkey(id, nome),
-          plano:planos_manutencao!os_plano_id_fkey(id, titulo, periodicidade)
-        `,
-          { count: "exact" }
-        )
-        .eq("ativo_id", ativoId)
-        .eq("condominio_id", condominioId) // <<< isolamento por condomínio
-        .order("data_abertura", { ascending: false });
+export function useCondominioId() {
+  const [condominioId, setCondominioId] = useState<string | null>(getId());
 
-      if (limit) query = query.limit(limit);
+  useEffect(() => {
+    const sync = () => setCondominioId(getId());
+    // reage quando o Switcher dispara window.dispatchEvent(new Event("condominio:changed"))
+    window.addEventListener("condominio:changed", sync);
+    // reage a mudanças em outras abas
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("condominio:changed", sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
-      const { data, error, count } = await query;
-      if (error) throw error;
-
-      return { data: data ?? [], count: count ?? 0 };
-    },
-  });
-};
+  return condominioId;
+}
