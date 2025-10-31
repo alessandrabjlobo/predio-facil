@@ -4,11 +4,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useCondominioId } from "./useCondominioId";
 
+type ChecklistItem = {
+  id?: string;
+  titulo: string;
+  descricao?: string;
+  obrigatorio?: boolean;
+  ok?: boolean;
+  obs?: string;
+};
+
 export const useOrdemServico = () => {
   const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
-  // LISTAGEM
+  /**
+   * 🔎 LISTAGEM – agora trazendo checklist e campos “ricos”
+   */
   const { data: ordens, isLoading } = useQuery({
     queryKey: ["ordens-servico", condominioId],
     enabled: !!condominioId,
@@ -27,12 +38,18 @@ export const useOrdemServico = () => {
           prioridade,
           data_abertura,
           data_prevista,
+          sla_vencimento,
           data_conclusao,
           custo_previsto,
           custo_aprovado,
           custo_final,
           executor_nome,
           executor_contato,
+          tipo_executor,
+          local,
+          centro_custo,
+          pdf_path,
+          checklist,
           ativo:ativos(id, nome, tipo_id),
           plano:planos_manutencao(id, titulo, tipo, checklist),
           solicitante:usuarios!os_solicitante_id_fkey(id, nome),
@@ -46,16 +63,25 @@ export const useOrdemServico = () => {
     },
   });
 
-  // CRIAÇÃO (RPC estável com fallback)
+  /**
+   * 🧱 CRIAÇÃO – monta checklist e campos derivados no front (funciona já, mesmo sem RPC)
+   */
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
       ativoId,
       titulo,
       descricao,
-      tipo = "preventiva",
+      tipo = "preventiva",                   // 'preventiva' | 'corretiva'
       prioridade = "media",
-      dataPrevista,
+      dataPrevista,                          // string (YYYY-MM-DD) opcional
+      tipoExecutor = "externo",              // 'interno' | 'externo'
+      executorNome,
+      executorContato,
+      custoPrevisto,
+      centroCusto,
+      local,
+      checklistCustom,                       // se quiser forçar um checklist no ato
     }: {
       planoId?: string;
       ativoId: string;
@@ -64,85 +90,136 @@ export const useOrdemServico = () => {
       tipo?: "preventiva" | "corretiva" | string;
       prioridade?: string;
       dataPrevista?: string;
+      tipoExecutor?: "interno" | "externo" | string;
+      executorNome?: string;
+      executorContato?: string;
+      custoPrevisto?: number;
+      centroCusto?: string;
+      local?: string;
+      checklistCustom?: ChecklistItem[];
     }) => {
       if (!condominioId) throw new Error("Condomínio não encontrado");
 
-      // usuário autenticado -> pega usuarios.id
+      // Usuário autenticado -> pega usuarios.id (solicitante)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
-      const { data: usuario, error: eUsuario } = await supabase
+      const { data: usuario } = await supabase
         .from("usuarios")
         .select("id")
         .eq("auth_user_id", user.id)
         .single();
-      if (eUsuario || !usuario?.id) throw new Error("Usuário não encontrado");
 
-      // Normaliza tipo p/ enum permitido na coluna "origem"
-      const origemNormalizada =
-        tipo === "preventiva" || tipo === "corretiva" ? tipo : "corretiva";
+      if (!usuario?.id) throw new Error("Usuário não encontrado");
 
-      // 1) Tenta RPC estável `os_create`
-      const rpc = await supabase.rpc("os_create", {
+      // 1) Monta checklist: prioridade é plano > custom > tipo do ativo
+      let checklist: ChecklistItem[] = [];
+
+      // 1a. Se houver plano, usa checklist do plano
+      if (planoId) {
+        const { data: plano } = await supabase
+          .from("planos_manutencao")
+          .select("checklist")
+          .eq("id", planoId)
+          .maybeSingle();
+        if (plano?.checklist && Array.isArray(plano.checklist)) {
+          checklist = plano.checklist as ChecklistItem[];
+        }
+      }
+
+      // 1b. Se não veio do plano e foi passado um custom, usa-o
+      if (!checklist?.length && checklistCustom?.length) {
+        checklist = checklistCustom;
+      }
+
+      // 1c. Se ainda vazio, tenta checklist_default do tipo do ativo
+      if (!checklist?.length) {
+        // busca tipo do ativo -> ativo_tipos.checklist_default
+        const { data: ativo } = await supabase
+          .from("ativos")
+          .select("tipo_id")
+          .eq("id", ativoId)
+          .maybeSingle();
+
+        if (ativo?.tipo_id) {
+          const { data: tipoAtivo } = await supabase
+            .from("ativo_tipos")
+            .select("checklist_default")
+            .eq("id", ativo.tipo_id)
+            .maybeSingle();
+
+          if (tipoAtivo?.checklist_default && Array.isArray(tipoAtivo.checklist_default)) {
+            checklist = tipoAtivo.checklist_default as ChecklistItem[];
+          }
+        }
+      }
+
+      // 2) SLA: se dataPrevista não vier, considera 30 dias
+      const hoje = new Date();
+      const defaultVenc = new Date(hoje);
+      defaultVenc.setDate(defaultVenc.getDate() + 30);
+      const slaVencimento = dataPrevista
+        ? dataPrevista
+        : defaultVenc.toISOString().slice(0, 10); // YYYY-MM-DD
+
+      // 3) Mapeia origem válida no seu enum (preventiva|corretiva)
+      const origem = (tipo === "preventiva" || tipo === "corretiva") ? tipo : "corretiva";
+
+      // 4) Tenta RPC (se existir com essa assinatura). Se não, cai no INSERT.
+      const tryRpc = await supabase.rpc("criar_os_detalhada", {
+        // nomes que algumas versões suas esperam:
         p_condominio_id: condominioId,
         p_ativo_id: ativoId,
-        p_responsavel_id: usuario.id,
         p_titulo: titulo,
         p_plano_id: planoId ?? null,
         p_descricao: descricao ?? "",
+        p_tipo_manutencao: origem,             // em algumas versões é p_tipo_os
         p_prioridade: prioridade ?? "media",
-        p_tipo_os: origemNormalizada, // mapeia para 'preventiva' | 'corretiva'
+        p_tipo_executor: tipoExecutor ?? "externo",
+        p_executor_nome: executorNome ?? null,
+        p_executor_contato: executorContato ?? null,
         p_data_prevista: dataPrevista ?? null,
+        p_checklist_items: checklist ?? [],
+        p_nbr_referencias: null
       });
 
-      if (!rpc.error) {
-        // A RPC retorna os dados da OS criada (ou pelo menos o id/numero)
-        return rpc.data;
+      if (!tryRpc.error && tryRpc.data) {
+        return tryRpc.data; // sucesso via RPC
       }
 
-      // 2) Se a RPC não existe/exposta, faz FALLBACK para INSERT
-      const msg = rpc.error.message?.toLowerCase() ?? "";
-      const isMissing =
-        // alguns clientes retornam status em outra prop; protegemos por mensagem
-        msg.includes("not found") ||
-        msg.includes("does not exist") ||
-        (msg.includes("function") && msg.includes("does not exist"));
-
-      if (!isMissing) {
-        console.error("❌ Erro RPC os_create:", rpc.error);
-        throw new Error(rpc.error.message || "Erro ao criar OS (RPC)");
-      }
-
-      console.warn("↩️ RPC ausente: usando fallback INSERT em public.os");
-
-      // Fallback: usa somente colunas/valores válidos do schema atual
+      // Fallback 100% compatível com seu schema
       const { data, error } = await supabase
         .from("os")
         .insert({
           condominio_id: condominioId,
           plano_id: planoId ?? null,
           ativo_id: ativoId,
+          solicitante_id: usuario.id,
           titulo,
           descricao: descricao ?? "",
-          status: "aberta", // enum válido no teu schema
+          status: "aberta",
+          origem,
           prioridade: prioridade ?? "media",
-          origem: origemNormalizada, // 'preventiva' | 'corretiva'
+          tipo_executor: (tipoExecutor === "interno" || tipoExecutor === "externo") ? tipoExecutor : "externo",
+          executor_nome: executorNome ?? null,
+          executor_contato: executorContato ?? null,
           data_abertura: new Date().toISOString(),
           data_prevista: dataPrevista ?? null,
-          // não enviar campos que não existem (ex.: tipo_os)
+          sla_vencimento: slaVencimento,
+          custo_previsto: typeof custoPrevisto === "number" ? custoPrevisto : null,
+          centro_custo: centroCusto ?? null,
+          local: local ?? null,
+          checklist: checklist ?? [],
         })
         .select()
         .single();
 
-      if (error) {
-        console.error("❌ Erro INSERT fallback em os:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
-      toast({ title: "Sucesso", description: "Ordem de Serviço criada com sucesso!" });
+      toast({ title: "Sucesso", description: "Ordem de Serviço criada com checklist e campos completos!" });
     },
     onError: (error: any) => {
       toast({
@@ -153,7 +230,9 @@ export const useOrdemServico = () => {
     },
   });
 
-  // ATUALIZAR STATUS
+  /**
+   * 🔄 ATUALIZAR STATUS
+   */
   const updateOSStatus = useMutation({
     mutationFn: async ({ osId, status }: { osId: string; status: string }) => {
       const updates: any = { status };
@@ -184,7 +263,9 @@ export const useOrdemServico = () => {
     },
   });
 
-  // ATRIBUIR EXECUTOR
+  /**
+   * 👷 ATRIBUIR EXECUTOR
+   */
   const assignExecutor = useMutation({
     mutationFn: async ({
       osId,
@@ -218,7 +299,9 @@ export const useOrdemServico = () => {
     },
   });
 
-  // VALIDAR OS
+  /**
+   * ✅ VALIDAR OS
+   */
   const validateOS = useMutation({
     mutationFn: async ({
       osId,
