@@ -1,20 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCondominioAtual } from "./useCondominioAtual";
 import { toast } from "@/hooks/use-toast";
+import { useCondominioId } from "./useCondominioId"; // <— novo hook
 
 export const useOrdemServico = () => {
-  const { condominio } = useCondominioAtual();
+  const { condominioId } = useCondominioId();           // <— pega id atual
   const queryClient = useQueryClient();
 
-  /**
-   * 🧾 BUSCA LISTA DE ORDENS DE SERVIÇO
-   */
+  // 🧾 LISTA DE O.S.
   const { data: ordens, isLoading } = useQuery({
-    queryKey: ["ordens-servico", condominio?.id],
+    queryKey: ["ordens-servico", condominioId],         // <— inclui condo no cache key
+    enabled: !!condominioId,
     queryFn: async () => {
-      if (!condominio?.id) return [];
-
+      if (!condominioId) return [];
       const { data, error } = await supabase
         .from("os")
         .select(`
@@ -39,18 +37,15 @@ export const useOrdemServico = () => {
           solicitante:usuarios!os_solicitante_id_fkey(id, nome),
           executante:usuarios!os_executante_id_fkey(id, nome)
         `)
-        .eq("condominio_id", condominio.id)
+        .eq("condominio_id", condominioId)
         .order("data_abertura", { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return data ?? [];
     },
-    enabled: !!condominio?.id,
   });
 
-  /**
-   * 🧱 CRIAÇÃO DE ORDEM DE SERVIÇO (via RPC criar_os)
-   */
+  // 🧱 CRIA O.S. (RPC criar_os_detalhada)
   const createOS = useMutation({
     mutationFn: async ({
       planoId,
@@ -60,7 +55,7 @@ export const useOrdemServico = () => {
       tipo = "preventiva",
       prioridade = "media",
       dataPrevista,
-      slaDias = 30,
+      slaDias = 30, // mantido caso queira usar depois
     }: {
       planoId?: string;
       ativoId: string;
@@ -71,9 +66,8 @@ export const useOrdemServico = () => {
       dataPrevista?: string;
       slaDias?: number;
     }) => {
-      if (!condominio?.id) throw new Error("Condomínio não encontrado");
+      if (!condominioId) throw new Error("Condomínio não encontrado");
 
-      // Buscar usuário autenticado (solicitante)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -85,22 +79,8 @@ export const useOrdemServico = () => {
 
       if (!usuario) throw new Error("Usuário não encontrado");
 
-      // Log de depuração para o Supabase
-      console.log("📦 Enviando RPC criar_os", {
-        condominio_id: condominio.id,
-        plano_id: planoId,
-        ativo_id: ativoId,
-        responsavel_id: usuario.id,
-        titulo,
-        descricao,
-        tipo,
-        prioridade,
-        dataPrevista,
-      });
-
-      // 🚀 Chamada RPC corrigida
       const { data, error } = await supabase.rpc("criar_os_detalhada", {
-        p_condominio_id: condominio.id,
+        p_condominio_id: condominioId,
         p_plano_id: planoId || null,
         p_ativo_id: ativoId,
         p_responsavel_id: usuario.id,
@@ -111,24 +91,15 @@ export const useOrdemServico = () => {
         p_data_prevista: dataPrevista || null,
       });
 
-      if (error) {
-        console.error("❌ Erro Supabase RPC criar_os:", error);
-        throw new Error(error.message || "Erro desconhecido ao criar OS");
-      }
-
+      if (error) throw new Error(error.message || "Erro ao criar OS");
       return data;
     },
-
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ordens-servico"] });
-      toast({
-        title: "Sucesso",
-        description: "Ordem de Serviço criada com sucesso!",
-      });
+      // invalida a lista do condomínio atual
+      queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
+      toast({ title: "Sucesso", description: "Ordem de Serviço criada com sucesso!" });
     },
-
-    onError: (error) => {
-      console.error("❌ Erro ao criar OS:", error);
+    onError: (error: any) => {
       toast({
         title: "Erro",
         description: `Erro ao criar OS: ${error.message}`,
@@ -137,28 +108,16 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 🔄 ATUALIZA STATUS DA ORDEM
-   */
+  // 🔄 ATUALIZA STATUS
   const updateOSStatus = useMutation({
     mutationFn: async ({
       osId,
       status,
-      observacoes,
-    }: {
-      osId: string;
-      status: string;
-      observacoes?: string;
-    }) => {
+    }: { osId: string; status: string; observacoes?: string }) => {
       const updates: any = { status };
-
-      if (status === "em_execucao") {
-        updates.data_abertura = new Date().toISOString();
-      } else if (status === "concluida") {
-        updates.data_conclusao = new Date().toISOString();
-      } else if (status === "fechada") {
-        updates.data_fechamento = new Date().toISOString();
-      }
+      if (status === "em_execucao") updates.data_abertura = new Date().toISOString();
+      else if (status === "concluida") updates.data_conclusao = new Date().toISOString();
+      else if (status === "fechada") updates.data_fechamento = new Date().toISOString();
 
       const { data, error } = await supabase
         .from("os")
@@ -171,13 +130,10 @@ export const useOrdemServico = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ordens-servico"] });
-      toast({
-        title: "Sucesso",
-        description: "Status da OS atualizado!",
-      });
+      queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
+      toast({ title: "Sucesso", description: "Status da OS atualizado!" });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
         description: `Erro ao atualizar status: ${error.message}`,
@@ -186,19 +142,13 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 👷‍♂️ ATRIBUI EXECUTOR À OS
-   */
+  // 👷‍♂️ ATRIBUI EXECUTOR
   const assignExecutor = useMutation({
     mutationFn: async ({
       osId,
       executorNome,
       executorContato,
-    }: {
-      osId: string;
-      executorNome: string;
-      executorContato: string;
-    }) => {
+    }: { osId: string; executorNome: string; executorContato: string }) => {
       const { data, error } = await supabase
         .from("os")
         .update({
@@ -214,13 +164,10 @@ export const useOrdemServico = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ordens-servico"] });
-      toast({
-        title: "Sucesso",
-        description: "Executor atribuído à OS!",
-      });
+      queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
+      toast({ title: "Sucesso", description: "Executor atribuído à OS!" });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
         description: `Erro ao atribuir executor: ${error.message}`,
@@ -229,19 +176,13 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * ✅ VALIDAÇÃO DE OS (síndico aprova ou reprova)
-   */
+  // ✅ VALIDAÇÃO
   const validateOS = useMutation({
     mutationFn: async ({
       osId,
       aprovado,
       observacoes,
-    }: {
-      osId: string;
-      aprovado: boolean;
-      observacoes?: string;
-    }) => {
+    }: { osId: string; aprovado: boolean; observacoes?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
 
@@ -269,14 +210,11 @@ export const useOrdemServico = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ordens-servico"] });
-      queryClient.invalidateQueries({ queryKey: ["conformidade-itens"] });
-      toast({
-        title: "Sucesso",
-        description: "OS validada com sucesso!",
-      });
+      queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
+      queryClient.invalidateQueries({ queryKey: ["conformidade-itens", condominioId] });
+      toast({ title: "Sucesso", description: "OS validada com sucesso!" });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
         description: `Erro ao validar OS: ${error.message}`,
@@ -285,15 +223,5 @@ export const useOrdemServico = () => {
     },
   });
 
-  /**
-   * 🔁 EXPORTAÇÃO
-   */
-  return {
-    ordens,
-    isLoading,
-    createOS,
-    updateOSStatus,
-    assignExecutor,
-    validateOS,
-  };
+  return { ordens, isLoading, createOS, updateOSStatus, assignExecutor, validateOS };
 };
