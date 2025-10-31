@@ -1,3 +1,4 @@
+// src/components/OSDialog.tsx
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,11 +50,27 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
         .from("os")
         .select(`
           *,
-          ativo:ativos(id, nome, local, tipo_id, ativo_tipos(nome, sistema_manutencao)),
-          plano:planos_manutencao(id, titulo, tipo, checklist, periodicidade),
-          solicitante:usuarios!os_solicitante_id_fkey(id, nome, email),
-          executante:usuarios!os_executante_id_fkey(id, nome, email),
-          validador:usuarios!os_validado_por_fkey(id, nome)
+          ativo:ativos (
+            id,
+            nome,
+            local,
+            tipo_id,
+            tipo:ativo_tipos (
+              id,
+              nome,
+              slug
+            )
+          ),
+          plano:planos_manutencao (
+            id,
+            titulo,
+            tipo,
+            checklist,
+            periodicidade
+          ),
+          solicitante:usuarios!os_solicitante_id_fkey (id, nome, email),
+          executante:usuarios!os_executante_id_fkey (id, nome, email),
+          validador:usuarios!os_validado_por_fkey (id, nome)
         `)
         .eq("id", osId)
         .single();
@@ -115,6 +132,33 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     return null;
   }
 
+  // --------- Checklist para exibir (prioriza o que está gravado na OS) ----------
+  const checklistDaOS: any[] = Array.isArray(os.checklist) ? os.checklist : [];
+  const checklistDoPlano: any[] =
+    os.plano?.checklist && Array.isArray(os.plano.checklist) ? os.plano.checklist : [];
+  const checklistParaExibir = (checklistDaOS.length ? checklistDaOS : checklistDoPlano) as any[];
+
+  const renderChecklistLabel = (item: any) => {
+    // aceita vários formatos: {titulo}, {item}, string, etc.
+    if (!item) return "";
+    if (typeof item === "string") return item;
+    if (item.titulo) return item.titulo;
+    if (item.item) return item.item;
+    // fallback genérico
+    try {
+      return JSON.stringify(item);
+    } catch {
+      return String(item);
+    }
+  };
+
+  const formatCurrency = (val?: number | string | null) => {
+    if (val === null || val === undefined || val === "") return "-";
+    const num = typeof val === "string" ? Number(val) : val;
+    if (Number.isNaN(num)) return "-";
+    return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
@@ -137,11 +181,10 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
             <TabsContent value="detalhes" className="space-y-6 mt-6">
               {/* Status e Badges */}
               <div className="flex flex-wrap gap-2">
-                <Badge className={getStatusColor(os.status)}>
-                  {os.status}
-                </Badge>
-                <Badge variant="outline">{os.prioridade}</Badge>
-                <Badge variant="outline">{os.origem}</Badge>
+                <Badge className={getStatusColor(os.status)}>{os.status}</Badge>
+                {os.prioridade && <Badge variant="outline">{os.prioridade}</Badge>}
+                {os.origem && <Badge variant="outline">{os.origem}</Badge>}
+                {os.tipo_executor && <Badge variant="outline">{os.tipo_executor}</Badge>}
               </div>
 
               {/* Informações Básicas */}
@@ -166,12 +209,12 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                     <Label className="text-sm font-semibold">Ativo</Label>
                     <div className="mt-1 space-y-1">
                       <p className="text-sm">{os.ativo.nome}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Local: {os.ativo.local}
-                      </p>
-                      {os.ativo.ativo_tipos && (
+                      {os.ativo.local && (
+                        <p className="text-xs text-muted-foreground">Local: {os.ativo.local}</p>
+                      )}
+                      {os.ativo.tipo?.nome && (
                         <p className="text-xs text-muted-foreground">
-                          Sistema: {os.ativo.ativo_tipos.sistema_manutencao}
+                          Tipo do Ativo: {os.ativo.tipo.nome}
                         </p>
                       )}
                     </div>
@@ -188,7 +231,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                       Data Abertura
                     </Label>
                     <p className="text-sm mt-1">
-                      {new Date(os.data_abertura).toLocaleDateString('pt-BR')}
+                      {os.data_abertura ? new Date(os.data_abertura).toLocaleDateString("pt-BR") : "-"}
                     </p>
                   </div>
 
@@ -199,7 +242,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                         Data Prevista
                       </Label>
                       <p className="text-sm mt-1">
-                        {new Date(os.data_prevista).toLocaleDateString('pt-BR')}
+                        {new Date(os.data_prevista).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                   )}
@@ -208,7 +251,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                     <div>
                       <Label className="text-sm font-semibold">SLA Vencimento</Label>
                       <p className="text-sm mt-1">
-                        {new Date(os.sla_vencimento).toLocaleDateString('pt-BR')}
+                        {new Date(os.sla_vencimento).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                   )}
@@ -217,7 +260,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                     <div>
                       <Label className="text-sm font-semibold">Data Conclusão</Label>
                       <p className="text-sm mt-1">
-                        {new Date(os.data_conclusao).toLocaleDateString('pt-BR')}
+                        {new Date(os.data_conclusao).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
                   )}
@@ -260,7 +303,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                         Atribuir Executor
                       </Button>
                     </div>
-                  ) : os.executor_nome && (
+                  ) : os.executor_nome ? (
                     <div>
                       <p className="text-xs text-muted-foreground">Executor</p>
                       <p className="text-sm">{os.executor_nome}</p>
@@ -268,12 +311,12 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                         <p className="text-xs text-muted-foreground">{os.executor_contato}</p>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 <Separator />
 
-                {/* Custos */}
+                {/* Custos e campos “ricos” */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold flex items-center gap-1">
                     <DollarSign className="h-4 w-4" />
@@ -283,21 +326,30 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Previsto</p>
-                      <p className="text-sm">
-                        {os.custo_previsto ? `R$ ${os.custo_previsto}` : "-"}
-                      </p>
+                      <p className="text-sm">{formatCurrency(os.custo_previsto)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Aprovado</p>
-                      <p className="text-sm">
-                        {os.custo_aprovado ? `R$ ${os.custo_aprovado}` : "-"}
-                      </p>
+                      <p className="text-sm">{formatCurrency(os.custo_aprovado)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Final</p>
-                      <p className="text-sm font-semibold">
-                        {os.custo_final ? `R$ ${os.custo_final}` : "-"}
-                      </p>
+                      <p className="text-sm font-semibold">{formatCurrency(os.custo_final)}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Centro de Custo</p>
+                      <p className="text-sm">{os.centro_custo || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Local</p>
+                      <p className="text-sm">{os.local || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">PDF</p>
+                      <p className="text-sm">{os.pdf_path ? os.pdf_path.split("/").pop() : "-"}</p>
                     </div>
                   </div>
                 </div>
@@ -305,17 +357,17 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
             </TabsContent>
 
             <TabsContent value="checklist" className="space-y-4 mt-6">
-              {os.plano?.checklist && Array.isArray(os.plano.checklist) ? (
+              {checklistParaExibir.length > 0 ? (
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">Checklist NBR 5674</Label>
-                  {(os.plano.checklist as any[]).map((item: any, idx: number) => (
+                  <Label className="text-sm font-semibold">Checklist</Label>
+                  {checklistParaExibir.map((item: any, idx: number) => (
                     <div key={idx} className="flex items-center space-x-2">
                       <Checkbox id={`check-${idx}`} />
                       <label
                         htmlFor={`check-${idx}`}
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                       >
-                        {item.item || item}
+                        {renderChecklistLabel(item)}
                       </label>
                     </div>
                   ))}
@@ -334,14 +386,16 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
 
                 {anexos && anexos.length > 0 ? (
                   <div className="space-y-2">
-                    {anexos.map((anexo) => (
+                    {anexos.map((anexo: any) => (
                       <div
                         key={anexo.id}
                         className="flex items-center justify-between p-3 border rounded-lg"
                       >
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{anexo.file_path.split('/').pop()}</span>
+                          <span className="text-sm">
+                            {anexo.file_path?.split("/").pop() || anexo.file_path || "arquivo"}
+                          </span>
                         </div>
                         <Button size="sm" variant="ghost">
                           <Download className="h-4 w-4" />
@@ -372,7 +426,9 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                   <div>
                     <p className="text-sm font-semibold">OS Criada</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(os.data_abertura).toLocaleString('pt-BR')}
+                      {os.data_abertura
+                        ? new Date(os.data_abertura).toLocaleString("pt-BR")
+                        : "-"}
                     </p>
                   </div>
                 </div>
@@ -402,7 +458,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                     <div>
                       <p className="text-sm font-semibold">OS Concluída</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(os.data_conclusao).toLocaleString('pt-BR')}
+                        {new Date(os.data_conclusao).toLocaleString("pt-BR")}
                       </p>
                     </div>
                   </div>
@@ -444,7 +500,9 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
 
             {os.status === "em_execucao" && (
               <Button
-                onClick={() => updateOSStatus.mutate({ osId, status: "aguardando_validacao" })}
+                onClick={() =>
+                  updateOSStatus.mutate({ osId, status: "aguardando_validacao" })
+                }
                 className="w-full"
               >
                 Marcar como Concluída
