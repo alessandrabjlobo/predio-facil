@@ -1,51 +1,52 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCondominioAtual } from "./useCondominioAtual";
 import { toast } from "@/hooks/use-toast";
+import { useCondominioId } from "./useCondominioId"; // <— novo hook
 
 export const useChamados = () => {
-  const { condominio } = useCondominioAtual();
+  const { condominioId } = useCondominioId();
   const queryClient = useQueryClient();
 
   const { data: chamados, isLoading } = useQuery({
-    queryKey: ["chamados", condominio?.id],
+    queryKey: ["chamados", condominioId],         // <— chave depende do condo
+    enabled: !!condominioId,
     queryFn: async () => {
-      if (!condominio?.id) return [];
-      
+      if (!condominioId) return [];
       const { data, error } = await supabase
         .from("chamados")
         .select("*")
-        .eq("condominio_id", condominio.id)
+        .eq("condominio_id", condominioId)
         .order("created_at", { ascending: false });
-
       if (error) throw error;
-      return data || [];
+      return data ?? [];
     },
-    enabled: !!condominio?.id,
   });
 
   const createChamado = useMutation({
-    mutationFn: async (newChamado: {
+    mutationFn: async (novo: {
       titulo: string;
       descricao?: string;
       prioridade: string;
       categoria?: string;
       local?: string;
     }) => {
-      if (!condominio?.id) throw new Error("Condomínio não encontrado");
+      if (!condominioId) throw new Error("Condomínio não encontrado");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
 
       const { data: usuario } = await supabase
         .from("usuarios")
         .select("id")
-        .eq("auth_user_id", (await supabase.auth.getUser()).data.user?.id)
+        .eq("auth_user_id", user.id)
         .single();
 
       const { data, error } = await supabase
         .from("chamados")
         .insert({
-          ...newChamado,
-          condominio_id: condominio.id,
-          criado_por: usuario?.id,
+          ...novo,
+          condominio_id: condominioId,
+          criado_por: usuario?.id ?? null,
         })
         .select()
         .single();
@@ -54,13 +55,10 @@ export const useChamados = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chamados"] });
-      toast({
-        title: "Sucesso",
-        description: "Chamado criado com sucesso!",
-      });
+      queryClient.invalidateQueries({ queryKey: ["chamados", condominioId] });
+      toast({ title: "Sucesso", description: "Chamado criado com sucesso!" });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
         title: "Erro",
         description: `Erro ao criar chamado: ${error.message}`,
