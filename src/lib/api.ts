@@ -1191,6 +1191,83 @@ export async function createOSFromManut(manut: {
   });
 }
 
+// ----- Helpers específicos de OS (mudança mínima) -----
+
+// Inclui status opcional "aguardando_validacao"
+export type OSStatus =
+  | "aberta"
+  | "em andamento"
+  | "aguardando_validacao"
+  | "concluida"
+  | "cancelada";
+
+// Atualiza normalização para aceitar/produzir "aguardando_validacao"
+function osNormalizeStatus(s?: string | null): OSStatus {
+  const k = (s ?? "").toLowerCase().trim();
+  if (k === "em_andamento" || k === "em andamento") return "em andamento";
+  if (k === "aguardando_validacao" || k === "aguardando validacao") return "aguardando_validacao";
+  if (k === "concluida") return "concluida";
+  if (k === "cancelada") return "cancelada";
+  return "aberta";
+}
+
+function osDbEncodeStatus(s: OSStatus): string {
+  if (s === "em andamento") return "em_andamento";
+  return s; // mantém aguardando_validacao/concluida/cancelada/aberta
+}
+
+/** muda status com carimbo de datas quando fizer sentido */
+export async function setOSStatus(id: string, status: OSStatus) {
+  const patch: any = { status: osDbEncodeStatus(status), updated_at: new Date().toISOString() };
+  if (status === "concluida") patch.data_fechamento = new Date().toISOString();
+  const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().maybeSingle();
+  if (error) throw error;
+  return data ? { ...data, status: osNormalizeStatus((data as any).status) } : null;
+}
+
+/** atribui executor e já coloca em 'em andamento' */
+export async function assignOSExecutor(id: string, nome: string, contato?: string | null) {
+  const patch: any = {
+    executor_nome: nome,
+    executor_contato: contato ?? null,
+    responsavel: "externo",
+    status: osDbEncodeStatus("em andamento"),
+    updated_at: new Date().toISOString(),
+  };
+  try {
+    const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().single();
+    if (error) throw error;
+    return { ...data, status: osNormalizeStatus((data as any).status) } as OSRow;
+  } catch (e) {
+    // fallback se colunas executor_* não existirem ainda: muda só status
+    await setOSStatus(id, "em andamento");
+    return getOS(id);
+  }
+}
+
+/** validação simples: se aprovado -> concluída; se reprovado -> volta para em andamento
+ *  Tenta guardar observações se a coluna existir.
+ */
+export async function validateOS(id: string, aprovado: boolean, observacoes?: string | null) {
+  const next = aprovado ? "concluida" : "em andamento";
+  const patch: any = {
+    status: osDbEncodeStatus(next as OSStatus),
+    updated_at: new Date().toISOString(),
+  };
+  if (observacoes != null) patch.observacoes_validacao = observacoes;
+
+  try {
+    const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().single();
+    if (error) throw error;
+    return { ...data, status: osNormalizeStatus((data as any).status) } as OSRow;
+  } catch {
+    // se coluna observacoes_validacao não existir, tenta só status
+    await setOSStatus(id, next as OSStatus);
+    return getOS(id);
+  }
+}
+
+
 /* ===========================
  * CONFIGURAÇÕES DO CONDOMÍNIO
  * =========================== */
