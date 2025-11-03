@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCondominioId } from "./useCondominioId";
 
 export function useOS() {
-  const { condominioId } = useCondominioId();
+  const condominioId = useCondominioId();
 
   return useQuery({
     queryKey: ["os", condominioId],

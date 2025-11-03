@@ -17,7 +17,7 @@ export interface EventoCalendario {
 }
 
 export const useCalendarioManutencoes = () => {
-  const { condominioId } = useCondominioId();
+  const condominioId = useCondominioId();
 
   const { data: eventos, isLoading } = useQuery({
     queryKey: ["calendario-manutencoes", condominioId],

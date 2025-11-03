@@ -70,7 +70,8 @@ export function CondominioAtualProvider({ children }: { children: React.ReactNod
         if (eRels) throw eRels;
 
         const listaConds = (rels ?? [])
-          .map((r: UCRow) => r.condominios)
+          .map((r: any) => r.condominios)
+          .flat()
           .filter(Boolean) as Condominio[];
 
         if (!mounted) return;
@@ -85,7 +86,7 @@ export function CondominioAtualProvider({ children }: { children: React.ReactNod
         }
 
         // 2) senão, usa principal
-        const principal = (rels ?? []).find((r: UCRow) => r.is_principal);
+        const principal = (rels ?? []).find((r: any) => r.is_principal);
         if (principal?.condominio_id && listaConds.some((c) => c.id === principal.condominio_id)) {
           setCondominioAtualId(principal.condominio_id);
           return;

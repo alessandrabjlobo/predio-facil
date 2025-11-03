@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCondominioId } from "./useCondominioId";
 
 export function useKpisManutencao() {
-  const { condominioId } = useCondominioId();
+  const condominioId = useCondominioId();
 
   const osPipeline = useQuery({
     queryKey: ["v_os_pipeline", condominioId],

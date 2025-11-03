@@ -4,7 +4,7 @@ import { toast } from "@/hooks/use-toast";
 import { useCondominioId } from "./useCondominioId";
 
 export const useChamados = () => {
-  const { condominioId } = useCondominioId();
+  const condominioId = useCondominioId();
   const queryClient = useQueryClient();
 
   const { data: chamados, isLoading } = useQuery({

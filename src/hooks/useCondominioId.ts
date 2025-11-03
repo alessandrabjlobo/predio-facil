@@ -19,16 +19,14 @@ function getId(): string | null {
  * Observação: este hook não retorna setter. A troca do condomínio
  * é feita via evento customizado "condominio:changed" + localStorage.
  */
-export function useCondominioId() {
+export function useCondominioId(): string | null {
   const [condominioId, setCondominioId] = useState<string | null>(getId());
 
   useEffect(() => {
     const sync = () => setCondominioId(getId());
 
-    // reage quando o Switcher dispara window.dispatchEvent(new Event("condominio:changed"))
     window.addEventListener("condominio:changed", sync);
 
-    // reage a mudanças em outras abas
     const onStorage = (e: StorageEvent) => {
       if (e.key === KEY) sync();
     };

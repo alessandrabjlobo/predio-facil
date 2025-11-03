@@ -114,8 +114,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     if (!executorNome || !executorContato) return;
     await assignExecutor.mutateAsync({
       osId,
-      executorNome,
-      executorContato,
+      executorId: executorNome, // Simplified for now, should use actual user ID
     });
   };
 

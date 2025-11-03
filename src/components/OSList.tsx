@@ -59,10 +59,12 @@ export const OSList = () => {
   };
 
   const filteredOrdens = ordens?.filter((os) => {
+    const ativo = os.ativo as any;
+    const ativoNome = Array.isArray(ativo) ? ativo[0]?.nome : ativo?.nome;
     const matchesSearch = 
       os.numero?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       os.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      os.ativo?.nome?.toLowerCase().includes(searchTerm.toLowerCase());
+      ativoNome?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === "all" || os.status === statusFilter;
     
@@ -162,12 +164,16 @@ export const OSList = () => {
               </div>
 
               <div className="space-y-2 text-sm">
-                {os.ativo && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <ClipboardList className="h-4 w-4" />
-                    <span className="truncate">{os.ativo.nome}</span>
-                  </div>
-                )}
+                {os.ativo && (() => {
+                  const ativo = os.ativo as any;
+                  const nome = Array.isArray(ativo) ? ativo[0]?.nome : ativo?.nome;
+                  return nome ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <ClipboardList className="h-4 w-4" />
+                      <span className="truncate">{nome}</span>
+                    </div>
+                  ) : null;
+                })()}
                 {os.executor_nome && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
