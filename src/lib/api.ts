@@ -343,12 +343,19 @@ export async function createAtivo(payload: {
           const { error: eIns } = await supabase
             .from("planos_manutencao")
             .insert(r as any);
-          if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
+        if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
         }
       }
     }
   } catch (e) {
     console.warn("Templates não aplicados:", (e as any)?.message);
+  }
+
+  // garante um plano preventivo default conforme o tipo (se tiver periodicidade_default)
+  try {
+    await ensureDefaultPlanoParaAtivo({ id: ativo.id, tipo: payload.tipo });
+  } catch (e) {
+    console.warn("Plano default não criado:", (e as any)?.message);
   }
 
   return ativo;
@@ -926,7 +933,12 @@ export async function adiarProximoConformidade(
  * MÓDULO DE OS (Ordem de Serviço)
  * =========================== */
 
-export type OSStatus = "aberta" | "em andamento" | "concluida" | "cancelada";
+export type OSStatus =
+  | "aberta"
+  | "em andamento"
+  | "aguardando_validacao"
+  | "concluida"
+  | "cancelada";
 
 export type OSRow = {
   id: string;
@@ -953,17 +965,17 @@ export type OSRow = {
   pdf_url?: string | null;
 };
 
-
-/** normaliza status vindo do DB (aceita 'em_andamento' OU 'em andamento') */
+/** normaliza status vindo do DB */
 function osNormalizeStatus(s?: string | null): OSStatus {
   const k = (s ?? "").toLowerCase().trim();
   if (k === "em_andamento" || k === "em andamento") return "em andamento";
+  if (k === "aguardando_validacao" || k === "aguardando validacao") return "aguardando_validacao";
   if (k === "concluida") return "concluida";
   if (k === "cancelada") return "cancelada";
   return "aberta";
 }
 
-/** se o seu DB ainda usa 'em_andamento', com underscore, codifica assim. */
+/** encode para DB quando usa underscore */
 function osDbEncodeStatus(s: OSStatus): string {
   if (s === "em andamento") return "em_andamento";
   return s;
@@ -1025,13 +1037,12 @@ export async function listOS(params?: {
 }
 
 export async function getOS(id: string) {
-  // evita gerar select=*:1 em certos cenários do client
   const { data, error } = await supabase
     .from("os")
     .select("*")
     .eq("id", id)
-    .limit(1)            // 👈 força range seguro
-    .maybeSingle();      // 👈 não força header object
+    .limit(1)
+    .maybeSingle();
 
   if (error) throw error;
   if (!data) throw new Error("OS não encontrada");
@@ -1043,30 +1054,19 @@ export async function getOS(id: string) {
   } as OSRow;
 }
 
-
-/**
- * Insere OS — não envia data_abertura; deixa DEFAULT no DB.
- * Aceita origem/prioridade, mas só envia colunas seguras no insert.
- */
-/**
- * Cria OS "completa" e atualiza campos opcionais.
- * Tolera colunas ausentes (captura erro e segue).
- */
+/** Cria OS e faz patch de campos opcionais se existirem */
 export async function createOS(payload: {
   titulo: string;
   descricao?: string | null;
-  responsavel?: string | null;            // "interno" | "externo" | nome
+  responsavel?: string | null;
   ativo_id?: string | null;
   condominio_id?: string | null;
-
-  tipo_manutencao?: string | null;        // preventiva/corretiva/preditiva
-  prioridade?: string | null;             // baixa/media/alta/urgente
-  data_prevista?: string | null;          // 'YYYY-MM-DD'
-
+  tipo_manutencao?: string | null;
+  prioridade?: string | null;
+  data_prevista?: string | null;
   fornecedor_nome?: string | null;
   fornecedor_contato?: string | null;
-
-  origem?: string | null;                 // "manual" | "manutencao"
+  origem?: string | null;
 }) {
   const safeInsert: any = {
     titulo: payload.titulo,
@@ -1085,7 +1085,6 @@ export async function createOS(payload: {
 
   if (error) throw error;
 
-  // Patch dos campos opcionais (se a coluna existir, atualiza; se não existir, ignora)
   const patch: any = {};
   if (payload.origem != null) patch.origem = payload.origem;
   if (payload.prioridade != null) patch.prioridade = payload.prioridade;
@@ -1098,7 +1097,7 @@ export async function createOS(payload: {
     try {
       await supabase.from("os").update(patch).eq("id", (data as any).id);
     } catch {
-      // Se alguma coluna não existir ainda, silencie e siga.
+      // colunas opcionais podem não existir ainda
     }
   }
 
@@ -1109,7 +1108,6 @@ export async function createOS(payload: {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
-
 
 export async function updateOS(
   id: string,
@@ -1155,7 +1153,6 @@ export async function assignOSExecutor(
     status: osDbEncodeStatus("em andamento"),
   };
 
-  // campos opcionais: se existirem na tabela, atualizam; se não, ignoram
   try { upd.executor_nome = executorNome; } catch {}
   try { upd.executor_contato = executorContato; } catch {}
 
@@ -1171,17 +1168,14 @@ export async function assignOSExecutor(
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
-/** Atualiza o status da OS */
-export async function setOSStatus(
-  id: string,
-  status: OSStatus
-) {
+/** Atualiza o status da OS (marca data_fechamento quando concluir) */
+export async function setOSStatus(id: string, status: OSStatus) {
+  const patch: any = { status: osDbEncodeStatus(status), updated_at: new Date().toISOString() };
+  if (status === "concluida") patch.data_fechamento = new Date().toISOString();
+
   const { data, error } = await supabase
     .from("os")
-    .update({
-      status: osDbEncodeStatus(status),
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", id)
     .select()
     .single();
@@ -1190,17 +1184,17 @@ export async function setOSStatus(
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
-/** Aprova/reprova OS em 'aguardando_validacao' (grava observações se a coluna existir) */
+/** Validação: aprovado -> concluída; reprovado -> em andamento (guarda observações se existir) */
 export async function validateOS(
   id: string,
   aprovado: boolean,
   observacoes?: string | null
 ) {
+  const next: OSStatus = aprovado ? "concluida" : "em andamento";
   const patch: any = {
-    status: osDbEncodeStatus(aprovado ? "concluida" : "aberta"),
+    status: osDbEncodeStatus(next),
     updated_at: new Date().toISOString(),
   };
-  // campos opcionais
   try { patch.observacoes_validacao = observacoes ?? null; } catch {}
 
   const { data, error } = await supabase
@@ -1250,7 +1244,7 @@ export async function uploadOSPdf(
 
 /** Gerar OS a partir da manutenção/plano (usado pelo Ativos.tsx) */
 export async function createOSFromManut(manut: {
-  id: string; // pode ser "plano:<id>" também
+  id: string;
   titulo: string;
   ativo_id?: string | null;
   vencimento?: string | null;
@@ -1265,83 +1259,6 @@ export async function createOSFromManut(manut: {
     origem: "manutencao",
   });
 }
-
-// ----- Helpers específicos de OS (mudança mínima) -----
-
-// Inclui status opcional "aguardando_validacao"
-export type OSStatus =
-  | "aberta"
-  | "em andamento"
-  | "aguardando_validacao"
-  | "concluida"
-  | "cancelada";
-
-// Atualiza normalização para aceitar/produzir "aguardando_validacao"
-function osNormalizeStatus(s?: string | null): OSStatus {
-  const k = (s ?? "").toLowerCase().trim();
-  if (k === "em_andamento" || k === "em andamento") return "em andamento";
-  if (k === "aguardando_validacao" || k === "aguardando validacao") return "aguardando_validacao";
-  if (k === "concluida") return "concluida";
-  if (k === "cancelada") return "cancelada";
-  return "aberta";
-}
-
-function osDbEncodeStatus(s: OSStatus): string {
-  if (s === "em andamento") return "em_andamento";
-  return s; // mantém aguardando_validacao/concluida/cancelada/aberta
-}
-
-/** muda status com carimbo de datas quando fizer sentido */
-export async function setOSStatus(id: string, status: OSStatus) {
-  const patch: any = { status: osDbEncodeStatus(status), updated_at: new Date().toISOString() };
-  if (status === "concluida") patch.data_fechamento = new Date().toISOString();
-  const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().maybeSingle();
-  if (error) throw error;
-  return data ? { ...data, status: osNormalizeStatus((data as any).status) } : null;
-}
-
-/** atribui executor e já coloca em 'em andamento' */
-export async function assignOSExecutor(id: string, nome: string, contato?: string | null) {
-  const patch: any = {
-    executor_nome: nome,
-    executor_contato: contato ?? null,
-    responsavel: "externo",
-    status: osDbEncodeStatus("em andamento"),
-    updated_at: new Date().toISOString(),
-  };
-  try {
-    const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().single();
-    if (error) throw error;
-    return { ...data, status: osNormalizeStatus((data as any).status) } as OSRow;
-  } catch (e) {
-    // fallback se colunas executor_* não existirem ainda: muda só status
-    await setOSStatus(id, "em andamento");
-    return getOS(id);
-  }
-}
-
-/** validação simples: se aprovado -> concluída; se reprovado -> volta para em andamento
- *  Tenta guardar observações se a coluna existir.
- */
-export async function validateOS(id: string, aprovado: boolean, observacoes?: string | null) {
-  const next = aprovado ? "concluida" : "em andamento";
-  const patch: any = {
-    status: osDbEncodeStatus(next as OSStatus),
-    updated_at: new Date().toISOString(),
-  };
-  if (observacoes != null) patch.observacoes_validacao = observacoes;
-
-  try {
-    const { data, error } = await supabase.from("os").update(patch).eq("id", id).select().single();
-    if (error) throw error;
-    return { ...data, status: osNormalizeStatus((data as any).status) } as OSRow;
-  } catch {
-    // se coluna observacoes_validacao não existir, tenta só status
-    await setOSStatus(id, next as OSStatus);
-    return getOS(id);
-  }
-}
-
 
 /* ===========================
  * CONFIGURAÇÕES DO CONDOMÍNIO
