@@ -37,4 +37,11 @@ export default defineConfig(({ mode }) => ({
       { find: "@", replacement: path.resolve(__dirname, "./src") },
     ],
   },
+
+  // Explicitly define environment variables for the client
+  define: {
+    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(envUrl || ''),
+    'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(envKey || ''),
+    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(envKey || ''),
+  },
 }));
