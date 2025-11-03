@@ -1,13 +1,17 @@
-// src/lib/tenant.ts
 const KEY = 'currentCondominioId';
 
 export function getCurrentCondominioId(): string | null {
   try {
-    return localStorage.getItem(KEY);
+    const v = localStorage.getItem(KEY);
+    return v && v.trim() ? v : null;
   } catch { return null; }
 }
-export function setCurrentCondominioId(id: string) {
+
+export function setCurrentCondominioId(id: string | null) {
   try {
-    localStorage.setItem(KEY, id);
+    if (id && id.trim()) localStorage.setItem(KEY, id);
+    else localStorage.removeItem(KEY);
   } catch {}
+  // avisa a app inteira SEMPRE que houve troca
+  window.dispatchEvent(new Event("condominio:changed"));
 }
