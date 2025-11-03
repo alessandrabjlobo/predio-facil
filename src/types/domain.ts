@@ -1,5 +1,4 @@
-// Tipos centrais do domínio — importe estes em hooks, componentes e serviços.
-
+// src/types/domain.ts
 export type UUID = string;
 
 export type AppRole =
@@ -14,16 +13,15 @@ export interface Condominio {
   id: UUID;
   nome: string;
   cnpj?: string | null;
-  // ...estenda conforme sua base
+  endereco?: string | null;
 }
 
-/**
- * IMPORTANTE:
- * - No store, mantenha um DICIONÁRIO (objeto) indexado por id (lookup O(1)).
- * - Telas que listam devem chamar `toArray(dict)` em vez de assumir array.
- */
 export type CondominiosDict = Record<UUID, Condominio>;
 
+/**
+ * Converte dicionário (objeto indexado por id) para array,
+ * para uso seguro em .map() na UI (Selects, tabelas, etc.).
+ */
 export const toArray = <T>(dict: Record<string, T> | undefined | null): T[] =>
   dict ? Object.values(dict) : [];
 
@@ -39,6 +37,6 @@ export interface OrdemServico {
   sla_horas?: number | null;
   status: "aberta" | "em_execucao" | "em_aceite" | "fechada";
   created_by?: UUID | null;
-  executor_id?: UUID | null; // <— usado em assignExecutor
+  executor_id?: UUID | null; // se adotar nome unificado
   created_at?: string;
 }
