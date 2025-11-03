@@ -1046,20 +1046,29 @@ export async function createOS(payload: {
   ativo_id?: string | null;
   origem?: string | null;
   prioridade?: string | null;
+  condominio_id?: string | null;      // <-- NOVO
+  local_id?: string | null;           // opcional
+  data_prevista?: string | null;      // opcional (YYYY-MM-DD)
+  fornecedor_nome?: string | null;    // opcional
+  fornecedor_contato?: string | null; // opcional
+  tipo_manutencao?: 'preventiva' | 'corretiva' | 'preditiva' | null; // opcional
 }) {
   const safe: any = {
     titulo: payload.titulo,
     descricao: payload.descricao ?? null,
     responsavel: payload.responsavel ?? null,
     ativo_id: payload.ativo_id ?? null,
+    condominio_id: payload.condominio_id ?? null,   // <-- ESSENCIAL p/ RLS
     status: osDbEncodeStatus("aberta"),
   };
 
-  const { data, error } = await supabase
-    .from("os")
-    .insert(safe)
-    .select()
-    .single();
+  if (payload.local_id != null) safe.local_id = payload.local_id;
+  if (payload.data_prevista != null) safe.data_prevista = payload.data_prevista;
+  if (payload.fornecedor_nome != null) safe.fornecedor_nome = payload.fornecedor_nome;
+  if (payload.fornecedor_contato != null) safe.fornecedor_contato = payload.fornecedor_contato;
+  if (payload.tipo_manutencao != null) safe.tipo_manutencao = payload.tipo_manutencao;
+
+  const { data, error } = await supabase.from("os").insert(safe).select().single();
   if (error) throw error;
 
   if (payload.origem != null || payload.prioridade != null) {
@@ -1069,7 +1078,7 @@ export async function createOS(payload: {
       if (payload.prioridade != null) patch.prioridade = payload.prioridade;
       await supabase.from("os").update(patch).eq("id", (data as any).id);
     } catch {
-      // ignora se a coluna não existir
+      // ignora se não existirem no schema
     }
   }
 
@@ -1080,6 +1089,7 @@ export async function createOS(payload: {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
+
 
 export async function updateOS(
   id: string,
