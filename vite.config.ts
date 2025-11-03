@@ -29,12 +29,10 @@ export default defineConfig(({ mode }) => ({
 
   resolve: {
     alias: [
-      // ✅ Usa client.ts quando as envs estão setadas corretamente
+      // Always use real client - env vars are required
       {
         find: "@/integrations/supabase/client",
-        replacement: hasSupabaseEnv
-          ? path.resolve(__dirname, "./src/integrations/supabase/client.ts")
-          : path.resolve(__dirname, "./src/integrations/supabase/client-fallback.ts"),
+        replacement: path.resolve(__dirname, "./src/integrations/supabase/client.ts"),
       },
       { find: "@", replacement: path.resolve(__dirname, "./src") },
     ],

@@ -35,26 +35,28 @@ export function GerarOSDialog({ open, onOpenChange, manutencao }: GerarOSDialogP
 
       if (!ativo) throw new Error("Ativo não encontrado");
 
-      // Criar OS
-      const { data: os, error } = await supabase
-        .from("ordens_servico")
-        .insert({
-          titulo,
-          descricao,
-          condominio_id: ativo.condominio_id,
-          ativo_id: manutencao.ativo_id,
-          manutencao_id: manutencao.id,
-          status: "aberta",
-          prioridade: "media",
-        })
-        .select()
-        .single();
+      // Criar OS usando RPC unificado
+      const { data, error } = await supabase.rpc("criar_os_detalhada" as any, {
+        p_condominio_id: ativo.condominio_id,
+        p_ativo_id: manutencao.ativo_id,
+        p_titulo: titulo,
+        p_descricao: descricao,
+        p_prioridade: "media",
+        p_tipo_manutencao: "corretiva",
+      }) as any;
 
       if (error) throw error;
 
-      toast({ title: "OS criada com sucesso!" });
-      onOpenChange(false);
-      navigate(`/os?id=${os.id}`);
+      if (data && data[0]?.success) {
+        toast({
+          title: "OS criada com sucesso!",
+          description: `Ordem de Serviço ${data[0].os_numero} criada`
+        });
+        onOpenChange(false);
+        navigate(`/os?id=${data[0].os_id}`);
+      } else {
+        throw new Error(data?.[0]?.message || "Erro ao criar OS");
+      }
     } catch (error: any) {
       toast({
         title: "Erro ao criar OS",
