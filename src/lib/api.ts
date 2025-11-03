@@ -926,28 +926,33 @@ export async function adiarProximoConformidade(
  * MÓDULO DE OS (Ordem de Serviço)
  * =========================== */
 
-export type OSStatus =
-  | "aberta"
-  | "em andamento"
-  | "concluida"
-  | "cancelada";
+export type OSStatus = "aberta" | "em andamento" | "concluida" | "cancelada";
 
 export type OSRow = {
   id: string;
   titulo: string;
   descricao?: string | null;
   status: OSStatus;
-  responsavel?: string | null;
+  responsavel?: string | null;      // "interno" | "externo" | nome
   ativo_id?: string | null;
+  condominio_id?: string | null;
+
+  tipo_manutencao?: string | null;  // preventiva/corretiva/preditiva
+  prioridade?: string | null;       // baixa/media/alta/urgente
+  data_prevista?: string | null;    // ISO 'YYYY-MM-DD'
+
+  fornecedor_nome?: string | null;
+  fornecedor_contato?: string | null;
 
   created_at?: string | null;
   updated_at?: string | null;
-  data_abertura?: string | null; // opcional no DB – UI usa se existir
-  data_fechamento?: string | null; // opcional no DB – UI usa se existir
+  data_abertura?: string | null;
+  data_fechamento?: string | null;
 
-  pdf_path?: string | null; // no bucket os_docs
-  pdf_url?: string | null; // URL assinada calculada
+  pdf_path?: string | null;
+  pdf_url?: string | null;
 };
+
 
 /** normaliza status vindo do DB (aceita 'em_andamento' OU 'em andamento') */
 function osNormalizeStatus(s?: string | null): OSStatus {
