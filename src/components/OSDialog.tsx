@@ -1,8 +1,8 @@
 // src/components/OSDialog.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useOrdemServico } from "@/hooks/useOrdemServico";
+import { getOS } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -10,26 +10,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ClipboardList,
   Calendar,
-  User,
+  Clock,
   DollarSign,
   FileText,
   CheckCircle2,
   XCircle,
-  Clock,
-  Upload,
-  Download,
 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface OSDialogProps {
   osId: string;
@@ -38,65 +33,58 @@ interface OSDialogProps {
 }
 
 export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
-  const { updateOSStatus, assignExecutor, validateOS } = useOrdemServico();
-  const [executorNome, setExecutorNome] = useState("");
-  const [executorContato, setExecutorContato] = useState("");
   const [observacoes, setObservacoes] = useState("");
 
+  // Busca básica da OS (sem joins pesados)
   const { data: os, isLoading } = useQuery({
-    queryKey: ["os-detalhes", osId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("os")
-        .select(`
-          *,
-          ativo:ativos (
-            id,
-            nome,
-            local,
-            tipo_id,
-            tipo:ativo_tipos (
-              id,
-              nome,
-              slug
-            )
-          ),
-          plano:planos_manutencao (
-            id,
-            titulo,
-            tipo,
-            checklist,
-            periodicidade
-          ),
-          solicitante:usuarios!os_solicitante_id_fkey (id, nome, email),
-          executante:usuarios!os_executante_id_fkey (id, nome, email),
-          validador:usuarios!os_validado_por_fkey (id, nome)
-        `)
-        .eq("id", osId)
-        .single();
+    queryKey: ["os", osId],
+    queryFn: async () => await getOS(osId),
+    enabled: open && !!osId,
+  });
 
+  // Hidrata o ativo de forma leve (opcional e segura)
+  const { data: ativo } = useQuery({
+    queryKey: ["os-ativo", os?.ativo_id],
+    queryFn: async () => {
+      if (!os?.ativo_id) return null;
+      const { data, error } = await supabase
+        .from("ativos")
+        .select("id,nome,local")
+        .eq("id", os.ativo_id)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
-    enabled: open && !!osId,
+    enabled: open && !!os?.ativo_id,
   });
 
-  const { data: anexos } = useQuery({
-    queryKey: ["os-anexos", osId],
+  // PDF (assinado) se existir
+  const { data: pdfUrl } = useQuery({
+    queryKey: ["os-pdf", os?.pdf_path],
     queryFn: async () => {
+      if (!os?.pdf_path) return null;
       const { data, error } = await supabase
-        .from("os_anexos")
-        .select("*")
-        .eq("os_id", osId);
-
-      if (error) throw error;
-      return data || [];
+        .storage
+        .from("os_docs")
+        .createSignedUrl(os.pdf_path, 3600);
+      if (error) return null;
+      return data?.signedUrl ?? null;
     },
-    enabled: open && !!osId,
+    enabled: open && !!os?.pdf_path,
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const checklist: any[] = useMemo(() => {
+    if (!os?.checklist) return [];
+    return Array.isArray(os.checklist) ? os.checklist : [];
+  }, [os?.checklist]);
+
+  const status = String(os?.status ?? "aberta");
+  const prioridade = os?.prioridade ? String(os.prioridade) : undefined;
+  const origem = os?.origem ? String(os.origem) : undefined;
+  const tipoExecutor = os?.tipo_executor ? String(os.tipo_executor) : undefined;
+
+  const getStatusColor = (s: string) => {
+    switch (s) {
       case "concluida":
       case "fechada":
         return "bg-green-500/10 text-green-700";
@@ -110,53 +98,29 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     }
   };
 
-  const handleAssignExecutor = async () => {
-    if (!executorNome || !executorContato) return;
-    await assignExecutor.mutateAsync({
-      osId,
-      executorId: executorNome, // Simplified for now, should use actual user ID
-    });
+  const fmtBR = (d?: string | null) =>
+    d ? new Date(d).toLocaleDateString("pt-BR") : "-";
+
+  const money = (v?: number | string | null) => {
+    if (v === null || v === undefined || v === "") return "-";
+    const n = typeof v === "string" ? Number(v) : v;
+    if (Number.isNaN(n)) return "-";
+    return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
-  const handleValidate = async (aprovado: boolean) => {
-    await validateOS.mutateAsync({
-      osId,
-      aprovado,
-      observacoes,
-    });
-    onOpenChange(false);
-  };
+  if (!open) return null;
 
   if (isLoading || !os) {
-    return null;
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Carregando OS…</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    );
   }
-
-  // --------- Checklist para exibir (prioriza o que está gravado na OS) ----------
-  const checklistDaOS: any[] = Array.isArray(os.checklist) ? os.checklist : [];
-  const checklistDoPlano: any[] =
-    os.plano?.checklist && Array.isArray(os.plano.checklist) ? os.plano.checklist : [];
-  const checklistParaExibir = (checklistDaOS.length ? checklistDaOS : checklistDoPlano) as any[];
-
-  const renderChecklistLabel = (item: any) => {
-    // aceita vários formatos: {titulo}, {item}, string, etc.
-    if (!item) return "";
-    if (typeof item === "string") return item;
-    if (item.titulo) return item.titulo;
-    if (item.item) return item.item;
-    // fallback genérico
-    try {
-      return JSON.stringify(item);
-    } catch {
-      return String(item);
-    }
-  };
-
-  const formatCurrency = (val?: number | string | null) => {
-    if (val === null || val === undefined || val === "") return "-";
-    const num = typeof val === "string" ? Number(val) : val;
-    if (Number.isNaN(num)) return "-";
-    return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,35 +128,33 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-primary" />
-            Ordem de Serviço - {os.numero}
+            Ordem de Serviço {os.numero ? `- ${os.numero}` : `#${os.id?.slice(0, 6)}`}
           </DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[calc(90vh-120px)]">
           <Tabs defaultValue="detalhes" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
               <TabsTrigger value="checklist">Checklist</TabsTrigger>
               <TabsTrigger value="documentos">Documentos</TabsTrigger>
-              <TabsTrigger value="timeline">Timeline</TabsTrigger>
             </TabsList>
 
+            {/* DETALHES */}
             <TabsContent value="detalhes" className="space-y-6 mt-6">
-              {/* Status e Badges */}
               <div className="flex flex-wrap gap-2">
-                <Badge className={getStatusColor(os.status)}>{os.status}</Badge>
-                {os.prioridade && <Badge variant="outline">{os.prioridade}</Badge>}
-                {os.origem && <Badge variant="outline">{os.origem}</Badge>}
-                {os.tipo_executor && <Badge variant="outline">{os.tipo_executor}</Badge>}
+                <Badge className={getStatusColor(status)}>{status}</Badge>
+                {prioridade && <Badge variant="outline">{prioridade}</Badge>}
+                {origem && <Badge variant="outline">{origem}</Badge>}
+                {tipoExecutor && <Badge variant="outline">{tipoExecutor}</Badge>}
               </div>
 
-              {/* Informações Básicas */}
               <div className="space-y-4">
+                {/* Título & Descrição */}
                 <div>
                   <Label className="text-sm font-semibold">Título</Label>
                   <p className="text-sm mt-1">{os.titulo}</p>
                 </div>
-
                 {os.descricao && (
                   <div>
                     <Label className="text-sm font-semibold">Descrição</Label>
@@ -203,21 +165,16 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                 <Separator />
 
                 {/* Ativo */}
-                {os.ativo && (
+                {ativo && (
                   <div>
                     <Label className="text-sm font-semibold">Ativo</Label>
                     <div className="mt-1 space-y-1">
-                      <p className="text-sm">{os.ativo.nome}</p>
-                      {os.ativo.local && (
-                        <p className="text-xs text-muted-foreground">Local: {os.ativo.local}</p>
-                      )}
-                      {os.ativo.tipo?.nome && (
-                        <p className="text-xs text-muted-foreground">
-                          Tipo do Ativo: {os.ativo.tipo.nome}
-                        </p>
+                      <p className="text-sm">{ativo.nome}</p>
+                      {ativo.local && (
+                        <p className="text-xs text-muted-foreground">Local: {ativo.local}</p>
                       )}
                     </div>
-                  </div>
+                </div>
                 )}
 
                 <Separator />
@@ -227,287 +184,116 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                   <div>
                     <Label className="text-sm font-semibold flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      Data Abertura
+                      Data de Abertura
                     </Label>
-                    <p className="text-sm mt-1">
-                      {os.data_abertura ? new Date(os.data_abertura).toLocaleDateString("pt-BR") : "-"}
-                    </p>
+                    <p className="text-sm mt-1">{fmtBR(os.data_abertura)}</p>
                   </div>
-
                   {os.data_prevista && (
                     <div>
                       <Label className="text-sm font-semibold flex items-center gap-1">
                         <Clock className="h-4 w-4" />
                         Data Prevista
                       </Label>
-                      <p className="text-sm mt-1">
-                        {new Date(os.data_prevista).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                  )}
-
-                  {os.sla_vencimento && (
-                    <div>
-                      <Label className="text-sm font-semibold">SLA Vencimento</Label>
-                      <p className="text-sm mt-1">
-                        {new Date(os.sla_vencimento).toLocaleDateString("pt-BR")}
-                      </p>
-                    </div>
-                  )}
-
-                  {os.data_conclusao && (
-                    <div>
-                      <Label className="text-sm font-semibold">Data Conclusão</Label>
-                      <p className="text-sm mt-1">
-                        {new Date(os.data_conclusao).toLocaleDateString("pt-BR")}
-                      </p>
+                      <p className="text-sm mt-1">{fmtBR(os.data_prevista)}</p>
                     </div>
                   )}
                 </div>
 
                 <Separator />
 
-                {/* Responsáveis */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-semibold flex items-center gap-1">
-                    <User className="h-4 w-4" />
-                    Responsáveis
-                  </Label>
-
-                  {os.solicitante && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Solicitante</p>
-                      <p className="text-sm">{os.solicitante.nome}</p>
-                    </div>
-                  )}
-
-                  {os.status === "aberta" ? (
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground">Atribuir Executor</p>
-                      <Input
-                        placeholder="Nome do executor"
-                        value={executorNome}
-                        onChange={(e) => setExecutorNome(e.target.value)}
-                      />
-                      <Input
-                        placeholder="Contato do executor"
-                        value={executorContato}
-                        onChange={(e) => setExecutorContato(e.target.value)}
-                      />
-                      <Button
-                        onClick={handleAssignExecutor}
-                        disabled={!executorNome || !executorContato}
-                        size="sm"
-                      >
-                        Atribuir Executor
-                      </Button>
-                    </div>
-                  ) : os.executor_nome ? (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Executor</p>
-                      <p className="text-sm">{os.executor_nome}</p>
-                      {os.executor_contato && (
-                        <p className="text-xs text-muted-foreground">{os.executor_contato}</p>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-
-                <Separator />
-
-                {/* Custos e campos “ricos” */}
+                {/* Custos */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold flex items-center gap-1">
                     <DollarSign className="h-4 w-4" />
                     Custos
                   </Label>
-
                   <div className="grid grid-cols-3 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Previsto</p>
-                      <p className="text-sm">{formatCurrency(os.custo_previsto)}</p>
+                      <p className="text-sm">{money((os as any).custo_previsto)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Aprovado</p>
-                      <p className="text-sm">{formatCurrency(os.custo_aprovado)}</p>
+                      <p className="text-sm">{money((os as any).custo_aprovado)}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Final</p>
-                      <p className="text-sm font-semibold">{formatCurrency(os.custo_final)}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Centro de Custo</p>
-                      <p className="text-sm">{os.centro_custo || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Local</p>
-                      <p className="text-sm">{os.local || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">PDF</p>
-                      <p className="text-sm">{os.pdf_path ? os.pdf_path.split("/").pop() : "-"}</p>
+                      <p className="text-sm font-semibold">{money((os as any).custo_final)}</p>
                     </div>
                   </div>
                 </div>
+
+                {/* Observações (opção para validação) */}
+                {status === "aguardando_validacao" && (
+                  <div className="space-y-2">
+                    <Label>Observações de Validação</Label>
+                    <Textarea
+                      placeholder="Adicione observações sobre a validação..."
+                      value={observacoes}
+                      onChange={(e) => setObservacoes(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <Button className="flex-1 gap-2">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Aprovar
+                      </Button>
+                      <Button className="flex-1 gap-2" variant="destructive">
+                        <XCircle className="h-4 w-4" />
+                        Reprovar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </TabsContent>
 
+            {/* CHECKLIST */}
             <TabsContent value="checklist" className="space-y-4 mt-6">
-              {checklistParaExibir.length > 0 ? (
+              {checklist.length ? (
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Checklist</Label>
-                  {checklistParaExibir.map((item: any, idx: number) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <Checkbox id={`check-${idx}`} />
-                      <label
-                        htmlFor={`check-${idx}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {renderChecklistLabel(item)}
-                      </label>
-                    </div>
-                  ))}
+                  <ul className="space-y-2">
+                    {checklist.map((it: any, i: number) => {
+                      const label =
+                        typeof it === "string" ? it : it?.titulo ?? it?.item ?? JSON.stringify(it);
+                      return (
+                        <li key={i} className="text-sm p-2 border rounded-md">
+                          {label}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Nenhum checklist disponível</p>
               )}
             </TabsContent>
 
+            {/* DOCUMENTOS */}
             <TabsContent value="documentos" className="space-y-4 mt-6">
               <div className="space-y-2">
                 <Label className="text-sm font-semibold flex items-center gap-1">
                   <FileText className="h-4 w-4" />
-                  Documentos Anexados
+                  Documentos
                 </Label>
-
-                {anexos && anexos.length > 0 ? (
-                  <div className="space-y-2">
-                    {anexos.map((anexo: any) => (
-                      <div
-                        key={anexo.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            {anexo.file_path?.split("/").pop() || anexo.file_path || "arquivo"}
-                          </span>
-                        </div>
-                        <Button size="sm" variant="ghost">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                {os.pdf_path ? (
+                  <div className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">{os.pdf_path.split("/").pop()}</span>
+                    </div>
+                    {pdfUrl && (
+                      <a href={pdfUrl} target="_blank" rel="noreferrer">
+                        <Button size="sm" variant="ghost">Abrir</Button>
+                      </a>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">Nenhum documento anexado</p>
                 )}
-
-                <Button variant="outline" className="w-full gap-2">
-                  <Upload className="h-4 w-4" />
-                  Upload de Documentos
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="timeline" className="space-y-4 mt-6">
-              <div className="space-y-4">
-                <div className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <div className="rounded-full bg-primary p-2">
-                      <Clock className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                    <div className="h-full w-px bg-border mt-2" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold">OS Criada</p>
-                    <p className="text-xs text-muted-foreground">
-                      {os.data_abertura
-                        ? new Date(os.data_abertura).toLocaleString("pt-BR")
-                        : "-"}
-                    </p>
-                  </div>
-                </div>
-
-                {os.executor_nome && (
-                  <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="rounded-full bg-blue-500 p-2">
-                        <User className="h-4 w-4 text-white" />
-                      </div>
-                      {os.data_conclusao && <div className="h-full w-px bg-border mt-2" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">Executor Atribuído</p>
-                      <p className="text-xs text-muted-foreground">{os.executor_nome}</p>
-                    </div>
-                  </div>
-                )}
-
-                {os.data_conclusao && (
-                  <div className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className="rounded-full bg-green-500 p-2">
-                        <CheckCircle2 className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">OS Concluída</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(os.data_conclusao).toLocaleString("pt-BR")}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             </TabsContent>
           </Tabs>
-
-          {/* Ações */}
-          <div className="mt-6 space-y-4">
-            {os.status === "aguardando_validacao" && (
-              <div className="space-y-2">
-                <Label>Observações de Validação</Label>
-                <Textarea
-                  placeholder="Adicione observações sobre a validação..."
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleValidate(true)}
-                    className="flex-1 gap-2"
-                    variant="default"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    Aprovar OS
-                  </Button>
-                  <Button
-                    onClick={() => handleValidate(false)}
-                    className="flex-1 gap-2"
-                    variant="destructive"
-                  >
-                    <XCircle className="h-4 w-4" />
-                    Reprovar
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {os.status === "em_execucao" && (
-              <Button
-                onClick={() =>
-                  updateOSStatus.mutate({ osId, status: "aguardando_validacao" })
-                }
-                className="w-full"
-              >
-                Marcar como Concluída
-              </Button>
-            )}
-          </div>
         </ScrollArea>
       </DialogContent>
     </Dialog>
