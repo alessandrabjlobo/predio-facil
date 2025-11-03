@@ -1143,6 +1143,77 @@ export async function updateOS(
   } as OSRow;
 }
 
+/** Atribui executor por nome/contato e coloca status em 'em andamento' */
+export async function assignOSExecutor(
+  id: string,
+  executorNome: string,
+  executorContato: string | null
+) {
+  const upd: any = {
+    responsavel: executorNome || null,
+    updated_at: new Date().toISOString(),
+    status: osDbEncodeStatus("em andamento"),
+  };
+
+  // campos opcionais: se existirem na tabela, atualizam; se não, ignoram
+  try { upd.executor_nome = executorNome; } catch {}
+  try { upd.executor_contato = executorContato; } catch {}
+
+  const { data, error } = await supabase
+    .from("os")
+    .update(upd)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  const r: any = data;
+  return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
+}
+
+/** Atualiza o status da OS */
+export async function setOSStatus(
+  id: string,
+  status: OSStatus
+) {
+  const { data, error } = await supabase
+    .from("os")
+    .update({
+      status: osDbEncodeStatus(status),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  const r: any = data;
+  return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
+}
+
+/** Aprova/reprova OS em 'aguardando_validacao' (grava observações se a coluna existir) */
+export async function validateOS(
+  id: string,
+  aprovado: boolean,
+  observacoes?: string | null
+) {
+  const patch: any = {
+    status: osDbEncodeStatus(aprovado ? "concluida" : "aberta"),
+    updated_at: new Date().toISOString(),
+  };
+  // campos opcionais
+  try { patch.observacoes_validacao = observacoes ?? null; } catch {}
+
+  const { data, error } = await supabase
+    .from("os")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  const r: any = data;
+  return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
+}
+
 export async function deleteOS(id: string): Promise<void> {
   const { error } = await supabase.from("os").delete().eq("id", id);
   if (error) throw error;
