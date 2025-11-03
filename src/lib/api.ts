@@ -1025,11 +1025,14 @@ export async function listOS(params?: {
 }
 
 export async function getOS(id: string) {
+  // evita gerar select=*:1 em certos cenários do client
   const { data, error } = await supabase
     .from("os")
     .select("*")
     .eq("id", id)
-    .maybeSingle();
+    .limit(1)            // 👈 força range seguro
+    .maybeSingle();      // 👈 não força header object
+
   if (error) throw error;
   if (!data) throw new Error("OS não encontrada");
   const r: any = data;
@@ -1039,6 +1042,7 @@ export async function getOS(id: string) {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
+
 
 /**
  * Insere OS — não envia data_abertura; deixa DEFAULT no DB.
