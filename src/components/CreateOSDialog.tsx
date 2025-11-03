@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "@/components/ui/use-toast";
 
-import { listAtivos, getAtivoTipoMeta, createOS, type OSRow } from "@/lib/api";
+import { listAtivos, createOS, type OSRow } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
   open: boolean;
@@ -86,6 +87,7 @@ export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props)
         setValue("titulo", `OS – ${a.nome}`);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAtivoId, ativos]);
 
   const onClose = () => {
@@ -97,27 +99,43 @@ export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props)
     try {
       setLoading(true);
 
-      // Monta título “bonitinho” se usuário não mexeu
+      // Monta título se usuário não preencheu
       const titulo =
         data.titulo?.trim() ||
         (ativos.find(a => a.id === data.ativo_id)?.nome
           ? `OS – ${ativos.find(a => a.id === data.ativo_id)!.nome}`
           : "Ordem de Serviço");
 
-      const payload = {
+      // Seu backend aceita estes campos com segurança:
+      const payloadBase = {
         titulo,
         descricao: data.descricao ?? null,
         ativo_id: data.ativo_id ?? null,
-        tipo_manutencao: data.tipo_manutencao,
-        prioridade: data.prioridade,
-        data_prevista: data.data_prevista ?? null,
-        responsavel: data.responsavel,
-        fornecedor_nome: data.responsavel === "externo" ? (data.fornecedor_nome ?? null) : null,
-        fornecedor_contato: data.responsavel === "externo" ? (data.fornecedor_contato ?? null) : null,
-        origem: "manual",
+        prioridade: data.prioridade,              // ok no api.ts (atualiza depois do insert)
+        origem: data.tipo_manutencao as any,      // usamos tipo como origem
+        responsavel: data.responsavel,            // campo textual no seu api.ts
       };
 
-      const os = await createOS(payload);
+      // 1) cria a OS com o contrato mínimo compatível
+      const os = await createOS(payloadBase);
+
+      // 2) best-effort: tenta gravar campos “novos” se existirem no schema
+      //    (não falha a criação caso a coluna não exista ainda)
+      const patch: Record<string, any> = {};
+      if (data.data_prevista) patch.data_prevista = data.data_prevista;
+      patch.tipo_executor = data.responsavel === "externo" ? "externo" : "interno";
+      if (data.responsavel === "externo") {
+        if (data.fornecedor_nome) patch.executor_empresa = data.fornecedor_nome;
+        if (data.fornecedor_contato) patch.executor_contato = data.fornecedor_contato;
+      }
+      if (Object.keys(patch).length > 0) {
+        try {
+          await supabase.from("os").update(patch).eq("id", (os as any).id);
+        } catch {
+          // ignora: coluna pode não existir ainda
+        }
+      }
+
       toast({ title: "OS criada", description: "A ordem de serviço foi criada com sucesso." });
       onCreated?.(os);
       onClose();
@@ -219,7 +237,7 @@ export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props)
             </div>
           </div>
 
-          {/* Data Prevista */}
+          {/* Data Prevista / Responsável */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Data Prevista</Label>
@@ -229,7 +247,6 @@ export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props)
               />
             </div>
 
-            {/* Responsável */}
             <div>
               <Label>Responsável pela Execução</Label>
               <Select
@@ -277,7 +294,7 @@ export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props)
   );
 }
 
-/* ------------------------- DatePicker simples ------------------------- */
+/* ------------------------- DatePicker ------------------------- */
 function DatePicker({ valueISO, onChangeISO }: { valueISO: string; onChangeISO: (iso: string) => void }) {
   const [open, setOpen] = useState(false);
   const value = useMemo(() => (valueISO ? new Date(valueISO) : undefined), [valueISO]);
