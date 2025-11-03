@@ -15,7 +15,8 @@ type ChecklistItem = {
 };
 
 export const useOrdemServico = () => {
-  const { condominioId } = useCondominioId();
+  // ✅ seu hook retorna diretamente string | null
+  const condominioId = useCondominioId();
   const queryClient = useQueryClient();
 
   // LISTAGEM
@@ -163,7 +164,7 @@ export const useOrdemServico = () => {
 
       if (!rpc.error && rpc.data) {
         // A função grava os campos básicos e devolve {os_id, numero,...}
-        // Precisamos complementar os campos "ricos" (se existirem):
+        // Complementa os campos "ricos" (se existirem):
         const osId = (rpc.data as any).os_id ?? rpc.data?.id ?? null;
         if (osId) {
           const payload: any = {
@@ -294,5 +295,28 @@ export const useOrdemServico = () => {
     },
   });
 
-  return { ordens, isLoading, createOS, updateOSStatus, validateOS };
+  // ✅ NOVO — Atribuir/Desatribuir executor (interno)
+  const assignExecutor = useMutation({
+    mutationFn: async ({ osId, executorId }: { osId: string; executorId: string | null }) => {
+      // Ajuste o nome da coluna conforme seu schema: executante_id vs executor_id
+      const { data, error } = await supabase
+        .from("os")
+        .update({ executante_id: executorId }) // troque para { executor_id: executorId } se preferir unificar
+        .eq("id", osId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ordens-servico", condominioId] });
+      toast({ title: "Sucesso", description: "Executor atribuído com sucesso!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return { ordens, isLoading, createOS, updateOSStatus, validateOS, assignExecutor };
 };
