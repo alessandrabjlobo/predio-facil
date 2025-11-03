@@ -1044,46 +1044,57 @@ export async function getOS(id: string) {
  * Insere OS — não envia data_abertura; deixa DEFAULT no DB.
  * Aceita origem/prioridade, mas só envia colunas seguras no insert.
  */
+/**
+ * Cria OS "completa" e atualiza campos opcionais.
+ * Tolera colunas ausentes (captura erro e segue).
+ */
 export async function createOS(payload: {
   titulo: string;
   descricao?: string | null;
-  responsavel?: string | null;
+  responsavel?: string | null;            // "interno" | "externo" | nome
   ativo_id?: string | null;
-  origem?: string | null;
-  prioridade?: string | null;
-  condominio_id?: string | null;      // <-- NOVO
-  local_id?: string | null;           // opcional
-  data_prevista?: string | null;      // opcional (YYYY-MM-DD)
-  fornecedor_nome?: string | null;    // opcional
-  fornecedor_contato?: string | null; // opcional
-  tipo_manutencao?: 'preventiva' | 'corretiva' | 'preditiva' | null; // opcional
+  condominio_id?: string | null;
+
+  tipo_manutencao?: string | null;        // preventiva/corretiva/preditiva
+  prioridade?: string | null;             // baixa/media/alta/urgente
+  data_prevista?: string | null;          // 'YYYY-MM-DD'
+
+  fornecedor_nome?: string | null;
+  fornecedor_contato?: string | null;
+
+  origem?: string | null;                 // "manual" | "manutencao"
 }) {
-  const safe: any = {
+  const safeInsert: any = {
     titulo: payload.titulo,
     descricao: payload.descricao ?? null,
     responsavel: payload.responsavel ?? null,
     ativo_id: payload.ativo_id ?? null,
-    condominio_id: payload.condominio_id ?? null,   // <-- ESSENCIAL p/ RLS
+    condominio_id: payload.condominio_id ?? null,
     status: osDbEncodeStatus("aberta"),
   };
 
-  if (payload.local_id != null) safe.local_id = payload.local_id;
-  if (payload.data_prevista != null) safe.data_prevista = payload.data_prevista;
-  if (payload.fornecedor_nome != null) safe.fornecedor_nome = payload.fornecedor_nome;
-  if (payload.fornecedor_contato != null) safe.fornecedor_contato = payload.fornecedor_contato;
-  if (payload.tipo_manutencao != null) safe.tipo_manutencao = payload.tipo_manutencao;
+  const { data, error } = await supabase
+    .from("os")
+    .insert(safeInsert)
+    .select()
+    .single();
 
-  const { data, error } = await supabase.from("os").insert(safe).select().single();
   if (error) throw error;
 
-  if (payload.origem != null || payload.prioridade != null) {
+  // Patch dos campos opcionais (se a coluna existir, atualiza; se não existir, ignora)
+  const patch: any = {};
+  if (payload.origem != null) patch.origem = payload.origem;
+  if (payload.prioridade != null) patch.prioridade = payload.prioridade;
+  if (payload.tipo_manutencao != null) patch.tipo_manutencao = payload.tipo_manutencao;
+  if (payload.data_prevista != null) patch.data_prevista = payload.data_prevista;
+  if (payload.fornecedor_nome != null) patch.fornecedor_nome = payload.fornecedor_nome;
+  if (payload.fornecedor_contato != null) patch.fornecedor_contato = payload.fornecedor_contato;
+
+  if (Object.keys(patch).length) {
     try {
-      const patch: any = {};
-      if (payload.origem != null) patch.origem = payload.origem;
-      if (payload.prioridade != null) patch.prioridade = payload.prioridade;
       await supabase.from("os").update(patch).eq("id", (data as any).id);
     } catch {
-      // ignora se não existirem no schema
+      // Se alguma coluna não existir ainda, silencie e siga.
     }
   }
 
