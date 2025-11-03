@@ -7,11 +7,15 @@ export interface Condominio {
   endereco?: string | null;
 }
 
+/**
+ * Hook que lê do seu Context atual.
+ * Mantive nomes "loading" e "erro" para encaixar no que você usa nas telas.
+ */
 export const useCondominioAtual = () => {
   const { condominioAtual, loading, error } = useCtx();
 
   return {
-    condominio: condominioAtual as (Condominio | null),
+    condominio: condominioAtual as Condominio | null,
     loading,
     erro: error,
   };
