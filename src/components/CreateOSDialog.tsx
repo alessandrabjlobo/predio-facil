@@ -1,315 +1,306 @@
-// src/components/CreateOSDialog.tsx
-import { useState } from "react";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAtivos } from "@/hooks/useAtivos";
-import { useUsuariosCondominio } from "@/hooks/useUsuariosCondominio";
-import { useOrdemServico } from "@/hooks/useOrdemServico";
+import { Label } from "@/components/ui/label";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { CalendarIcon, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { toast } from "@/components/ui/use-toast";
 
-interface CreateOSDialogProps {
+import { listAtivos, getAtivoTipoMeta, createOS, type OSRow } from "@/lib/api";
+
+type Props = {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialData?: {
-    ativoId?: string;
-    titulo?: string;
-    tipo?: string;
-    dataPrevista?: string;
-    planoId?: string;
-  };
-}
+  onOpenChange: (v: boolean) => void;
+  onCreated?: (os: OSRow) => void;
+};
 
-export const CreateOSDialog = ({ open, onOpenChange, initialData }: CreateOSDialogProps) => {
-  const { ativos } = useAtivos();
-  const { zeladores } = useUsuariosCondominio();
-  const { createOS } = useOrdemServico();
+type FormData = {
+  ativo_id?: string;
+  ativo_tipo?: string;
+  local?: string;
 
-  const [titulo, setTitulo] = useState(initialData?.titulo || "");
-  const [descricao, setDescricao] = useState("");
-  const [tipo, setTipo] = useState(initialData?.tipo || "preventiva");
-  const [prioridade, setPrioridade] = useState("media");
-  const [ativoId, setAtivoId] = useState(initialData?.ativoId || "");
-  const [dataPrevista, setDataPrevista] = useState<Date | undefined>(
-    initialData?.dataPrevista ? new Date(initialData.dataPrevista) : undefined
-  );
-  const [slaDias, setSlaDias] = useState("30");
+  titulo: string;
+  descricao?: string;
 
-  const [centroCusto, setCentroCusto] = useState("");
-  const [local, setLocal] = useState("");
-  const [custoPrevisto, setCustoPrevisto] = useState("");
+  tipo_manutencao: "preventiva" | "corretiva" | "preditiva";
+  prioridade: "baixa" | "media" | "alta" | "urgente";
 
-  const [tipoExecutor, setTipoExecutor] = useState<"interno" | "externo">("interno");
-  const [executanteId, setExecutanteId] = useState("");
-  const [executorNome, setExecutorNome] = useState("");
-  const [executorContato, setExecutorContato] = useState("");
+  data_prevista?: string; // yyyy-MM-dd
 
-  const handleSubmit = async () => {
-    if (!titulo || !ativoId) return;
+  responsavel: "interno" | "externo";
+  fornecedor_nome?: string;
+  fornecedor_contato?: string;
+};
 
-    await createOS.mutateAsync({
-      titulo,
-      descricao,
-      ativoId,
-      planoId: initialData?.planoId,
-      tipo,
-      prioridade,
-      dataPrevista: dataPrevista?.toISOString().split("T")[0],
-      slaDias: parseInt(slaDias || "0", 10),
-      tipoExecutor,
-      executanteId: tipoExecutor === "interno" ? executanteId || undefined : undefined,
-      executorNome:  tipoExecutor === "externo" ? executorNome  || undefined : undefined,
-      executorContato: tipoExecutor === "externo" ? executorContato || undefined : undefined,
-      centroCusto: centroCusto || undefined,
-      local: local || undefined,
-      custoPrevisto: custoPrevisto ? Number(custoPrevisto) : undefined,
-    });
+export default function CreateOSDialog({ open, onOpenChange, onCreated }: Props) {
+  const [loading, setLoading] = useState(false);
+  const [ativos, setAtivos] = useState<Array<{ id: string; nome: string; tipo?: string | null; local?: string | null }>>([]);
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors }
+  } = useForm<FormData>({
+    defaultValues: {
+      titulo: "",
+      descricao: "",
+      tipo_manutencao: "preventiva",
+      prioridade: "media",
+      responsavel: "interno"
+    }
+  });
+
+  const selectedAtivoId = watch("ativo_id");
+  const responsavel = watch("responsavel");
+
+  // Carrega Ativos
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await listAtivos();
+        setAtivos(rows.map((a: any) => ({ id: a.id, nome: a.nome, tipo: a.tipo ?? null, local: a.local ?? null })));
+      } catch (e: any) {
+        toast({ variant: "destructive", title: "Erro", description: e.message ?? "Falha ao carregar ativos" });
+      }
+    })();
+  }, []);
+
+  // Prefill de tipo/local quando selecionar Ativo
+  useEffect(() => {
+    if (!selectedAtivoId) return;
+    const a = ativos.find(x => x.id === selectedAtivoId);
+    if (a) {
+      setValue("ativo_tipo", a.tipo ?? "");
+      setValue("local", a.local ?? "");
+      if (!watch("titulo")) {
+        setValue("titulo", `OS – ${a.nome}`);
+      }
+    }
+  }, [selectedAtivoId, ativos]);
+
+  const onClose = () => {
+    reset();
     onOpenChange(false);
-    resetForm();
   };
 
-  const resetForm = () => {
-    setTitulo("");
-    setDescricao("");
-    setTipo("preventiva");
-    setPrioridade("media");
-    setAtivoId("");
-    setDataPrevista(undefined);
-    setSlaDias("30");
-    setCentroCusto("");
-    setLocal("");
-    setCustoPrevisto("");
-    setTipoExecutor("interno");
-    setExecutanteId("");
-    setExecutorNome("");
-    setExecutorContato("");
+  const onSubmit = async (data: FormData) => {
+    try {
+      setLoading(true);
+
+      // Monta título “bonitinho” se usuário não mexeu
+      const titulo =
+        data.titulo?.trim() ||
+        (ativos.find(a => a.id === data.ativo_id)?.nome
+          ? `OS – ${ativos.find(a => a.id === data.ativo_id)!.nome}`
+          : "Ordem de Serviço");
+
+      const payload = {
+        titulo,
+        descricao: data.descricao ?? null,
+        ativo_id: data.ativo_id ?? null,
+        tipo_manutencao: data.tipo_manutencao,
+        prioridade: data.prioridade,
+        data_prevista: data.data_prevista ?? null,
+        responsavel: data.responsavel,
+        fornecedor_nome: data.responsavel === "externo" ? (data.fornecedor_nome ?? null) : null,
+        fornecedor_contato: data.responsavel === "externo" ? (data.fornecedor_contato ?? null) : null,
+        origem: "manual",
+      };
+
+      const os = await createOS(payload);
+      toast({ title: "OS criada", description: "A ordem de serviço foi criada com sucesso." });
+      onCreated?.(os);
+      onClose();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: "destructive", title: "Erro ao criar OS", description: e.message ?? "Falha inesperada" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(v) => { if (!loading) onOpenChange(v); }}>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nova Ordem de Serviço</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="titulo">Título *</Label>
-            <Input
-              id="titulo"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Descreva brevemente o serviço"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="descricao">Descrição</Label>
-            <Textarea
-              id="descricao"
-              value={descricao}
-              onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Detalhes adicionais sobre o serviço"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* ATIVO */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="tipo">Tipo de OS</Label>
-              <Select value={tipo} onValueChange={setTipo}>
-                <SelectTrigger id="tipo">
-                  <SelectValue />
+              <Label>Ativo</Label>
+              <Select
+                onValueChange={(v) => setValue("ativo_id", v)}
+                value={watch("ativo_id") || ""}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um ativo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="preventiva">Preventiva</SelectItem>
-                  <SelectItem value="corretiva">Corretiva</SelectItem>
-                  {/* 'emergencial' não existe no enum 'origem'; se escolher, o hook mapeia para 'corretiva' */}
-                  <SelectItem value="emergencial">Emergencial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label htmlFor="prioridade">Prioridade</Label>
-              <Select value={prioridade} onValueChange={setPrioridade}>
-                <SelectTrigger id="prioridade">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="baixa">Baixa</SelectItem>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="alta">Alta</SelectItem>
-                  <SelectItem value="urgente">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="ativo">Ativo *</Label>
-            <Select value={ativoId} onValueChange={(v) => setAtivoId(String(v))}>
-              <SelectTrigger id="ativo">
-                <SelectValue placeholder="Selecione o ativo" />
-              </SelectTrigger>
-              <SelectContent>
-                {ativos?.map((ativo: any) => (
-                  <SelectItem key={String(ativo.id)} value={String(ativo.id)}>
-                    {ativo.nome} {ativo.local && `- ${ativo.local}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Data Prevista</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dataPrevista && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dataPrevista ? format(dataPrevista, "PPP", { locale: ptBR }) : "Selecionar data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={dataPrevista} onSelect={setDataPrevista} initialFocus />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div>
-              <Label htmlFor="sla">SLA (dias)</Label>
-              <Input
-                id="sla"
-                type="number"
-                value={slaDias}
-                onChange={(e) => setSlaDias(e.target.value)}
-                min="1"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="centroCusto">Centro de Custo</Label>
-              <Input
-                id="centroCusto"
-                value={centroCusto}
-                onChange={(e) => setCentroCusto(e.target.value)}
-                placeholder="Ex.: Manutenção Predial"
-              />
-            </div>
-            <div>
-              <Label htmlFor="local">Local</Label>
-              <Input
-                id="local"
-                value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                placeholder="Ex.: Bloco B - Garagem"
-              />
-            </div>
-            <div>
-              <Label htmlFor="custo">Custo Previsto (R$)</Label>
-              <Input
-                id="custo"
-                type="number"
-                step="0.01"
-                value={custoPrevisto}
-                onChange={(e) => setCustoPrevisto(e.target.value)}
-                placeholder="0.00"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-3 border-t pt-4">
-            <Label>Tipo de Executor *</Label>
-            <RadioGroup value={tipoExecutor} onValueChange={(v) => setTipoExecutor(v as "interno" | "externo")}>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="interno" id="interno" />
-                <Label htmlFor="interno" className="font-normal cursor-pointer">
-                  Executor Interno (Zelador/Funcionário)
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="externo" id="externo" />
-                <Label htmlFor="externo" className="font-normal cursor-pointer">
-                  Fornecedor Externo
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {tipoExecutor === "interno" ? (
-            <div>
-              <Label htmlFor="executante">Executante *</Label>
-              <Select value={executanteId} onValueChange={(v) => setExecutanteId(String(v))}>
-                <SelectTrigger id="executante">
-                  <SelectValue placeholder="Selecione o responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  {zeladores?.map((z: any) => (
-                    <SelectItem key={String(z.id)} value={String(z.id)}>
-                      {z.nome}
-                    </SelectItem>
+                  {ativos.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4">
+
+            <div>
+              <Label>Tipo (do ativo)</Label>
+              <Input placeholder="Ex.: Acessibilidade" {...register("ativo_tipo")} />
+            </div>
+          </div>
+
+          {/* Local */}
+          <div>
+            <Label>Local</Label>
+            <Input placeholder="Ex.: Garagem" {...register("local")} />
+          </div>
+
+          {/* Título / Descrição */}
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <Label>Título da OS *</Label>
+              <Input {...register("titulo", { required: "Informe um título" })} />
+              {errors.titulo && <p className="text-sm text-red-500 mt-1">{errors.titulo.message}</p>}
+            </div>
+            <div>
+              <Label>Descrição Detalhada</Label>
+              <Textarea rows={4} placeholder="Descreva os serviços a serem realizados..." {...register("descricao")} />
+            </div>
+          </div>
+
+          {/* Tipo de Manutenção / Prioridade */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Tipo de Manutenção *</Label>
+              <Select
+                onValueChange={(v: any) => setValue("tipo_manutencao", v)}
+                value={watch("tipo_manutencao")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="preventiva">Preventiva</SelectItem>
+                  <SelectItem value="corretiva">Corretiva</SelectItem>
+                  <SelectItem value="preditiva">Preditiva</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Prioridade *</Label>
+              <Select
+                onValueChange={(v: any) => setValue("prioridade", v)}
+                value={watch("prioridade")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixa">🟢 Baixa</SelectItem>
+                  <SelectItem value="media">🟡 Média</SelectItem>
+                  <SelectItem value="alta">🟠 Alta</SelectItem>
+                  <SelectItem value="urgente">🔴 Urgente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Data Prevista */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Data Prevista</Label>
+              <DatePicker
+                valueISO={watch("data_prevista") || ""}
+                onChangeISO={(iso) => setValue("data_prevista", iso)}
+              />
+            </div>
+
+            {/* Responsável */}
+            <div>
+              <Label>Responsável pela Execução</Label>
+              <Select
+                onValueChange={(v: any) => setValue("responsavel", v)}
+                value={responsavel}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="interno">Equipe Interna</SelectItem>
+                  <SelectItem value="externo">Fornecedor Externo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Fornecedor (condicional) */}
+          {responsavel === "externo" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="responsavel">Nome do Responsável *</Label>
-                <Input
-                  id="responsavel"
-                  value={executorNome}
-                  onChange={(e) => setExecutorNome(e.target.value)}
-                  placeholder="Nome completo"
-                />
+                <Label>Nome da Empresa</Label>
+                <Input placeholder="Empresa XYZ Ltda" {...register("fornecedor_nome")} />
               </div>
               <div>
-                <Label htmlFor="contato">Contato *</Label>
-                <Input
-                  id="contato"
-                  value={executorContato}
-                  onChange={(e) => setExecutorContato(e.target.value)}
-                  placeholder="(00) 00000-0000"
-                />
+                <Label>Contato</Label>
+                <Input placeholder="(11) 99999-9999" {...register("fornecedor_contato")} />
               </div>
             </div>
           )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={createOS.isPending || !titulo || !ativoId}>
-            {createOS.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Criar OS
-          </Button>
-        </DialogFooter>
+          {/* Ações */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Ordem de Serviço
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );
-};
+}
+
+/* ------------------------- DatePicker simples ------------------------- */
+function DatePicker({ valueISO, onChangeISO }: { valueISO: string; onChangeISO: (iso: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const value = useMemo(() => (valueISO ? new Date(valueISO) : undefined), [valueISO]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !value && "text-muted-foreground")}>
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {value ? format(value, "dd/MM/yyyy") : <span>Selecionar data</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0">
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={(d) => {
+            setOpen(false);
+            onChangeISO(d ? d.toISOString().slice(0, 10) : "");
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
