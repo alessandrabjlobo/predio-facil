@@ -37,20 +37,18 @@ interface OSDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
+export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
   const [observacoes, setObservacoes] = useState("");
   const [executorNome, setExecutorNome] = useState("");
   const [executorContato, setExecutorContato] = useState("");
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Busca enxuta da OS
   const { data: os, isLoading, refetch } = useQuery({
     queryKey: ["os", osId],
     queryFn: async () => await getOS(osId),
     enabled: open && !!osId,
   });
 
-  // Hidrata o ativo leve (id, nome, local)
   const { data: ativo } = useQuery({
     queryKey: ["os-ativo", os?.ativo_id],
     queryFn: async () => {
@@ -59,6 +57,7 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
         .from("ativos")
         .select("id,nome,local")
         .eq("id", os.ativo_id)
+        .limit(1)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -66,7 +65,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
     enabled: open && !!os?.ativo_id,
   });
 
-  // PDF assinado, se existir
   const { data: pdfUrl } = useQuery({
     queryKey: ["os-pdf", os?.pdf_path],
     queryFn: async () => {
@@ -81,7 +79,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
     enabled: open && !!os?.pdf_path,
   });
 
-  // Derivados seguros
   const checklist: any[] = useMemo(() => {
     if (!os?.checklist) return [];
     return Array.isArray(os.checklist) ? os.checklist : [];
@@ -118,30 +115,49 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
     return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   };
 
-  // Ações
   const doAssign = async () => {
-    if (!executorNome) return;
-    await assignOSExecutor(osId, executorNome, executorContato || null);
-    toast?.({ title: "Executor atribuído" });
-    await refetch();
+    try {
+      if (!executorNome) return;
+      await assignOSExecutor(osId, executorNome, executorContato || null);
+      toast?.({ title: "Executor atribuído" });
+      await refetch();
+    } catch (e) {
+      console.error(e);
+      toast?.({ title: "Falha ao atribuir executor", variant: "destructive" });
+    }
   };
 
   const doValidate = async (aprovado: boolean) => {
-    await validateOS(osId, aprovado, observacoes || null);
-    toast?.({ title: aprovado ? "OS aprovada" : "OS reprovada" });
-    onOpenChange(false);
+    try {
+      await validateOS(osId, aprovado, observacoes || null);
+      toast?.({ title: aprovado ? "OS aprovada" : "OS reprovada" });
+      onOpenChange(false);
+    } catch (e) {
+      console.error(e);
+      toast?.({ title: "Falha na validação", variant: "destructive" });
+    }
   };
 
   const doConcluir = async () => {
-    await setOSStatus(osId, "concluida");
-    toast?.({ title: "OS concluída" });
-    onOpenChange(false);
+    try {
+      await setOSStatus(osId, "concluida");
+      toast?.({ title: "OS concluída" });
+      onOpenChange(false);
+    } catch (e) {
+      console.error(e);
+      toast?.({ title: "Falha ao alterar status", variant: "destructive" });
+    }
   };
 
   const doUpload = async (file: File) => {
-    const { url } = await uploadOSPdf(osId, file);
-    if (url) toast?.({ title: "Documento anexado" });
-    await refetch();
+    try {
+      const { url } = await uploadOSPdf(osId, file);
+      if (url) toast?.({ title: "Documento anexado" });
+      await refetch();
+    } catch (e) {
+      console.error(e);
+      toast?.({ title: "Falha no upload", variant: "destructive" });
+    }
   };
 
   if (!open) return null;
@@ -186,11 +202,11 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
               </div>
 
               <div className="space-y-4">
-                {/* Título & Descrição */}
                 <div>
                   <Label className="text-sm font-semibold">Título</Label>
                   <p className="text-sm mt-1">{os.titulo}</p>
                 </div>
+
                 {os.descricao && (
                   <div>
                     <Label className="text-sm font-semibold">Descrição</Label>
@@ -200,7 +216,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
 
                 <Separator />
 
-                {/* Ativo */}
                 {ativo && (
                   <div>
                     <Label className="text-sm font-semibold">Ativo</Label>
@@ -215,7 +230,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
 
                 <Separator />
 
-                {/* Datas */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-semibold flex items-center gap-1">
@@ -237,7 +251,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
 
                 <Separator />
 
-                {/* Custos */}
                 <div className="space-y-3">
                   <Label className="text-sm font-semibold flex items-center gap-1">
                     <DollarSign className="h-4 w-4" />
@@ -259,7 +272,6 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
                   </div>
                 </div>
 
-                {/* Atribuir executor (quando aberta) */}
                 {status === "aberta" && (
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">Atribuir Executor</Label>
@@ -281,14 +293,12 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
                   </div>
                 )}
 
-                {/* Concluir (quando em andamento) */}
                 {(status === "em andamento" || status === "em_execucao") && (
                   <Button className="w-full" onClick={doConcluir}>
                     Marcar como concluída
                   </Button>
                 )}
 
-                {/* Validação (quando aguardando_validacao) */}
                 {status === "aguardando_validacao" && (
                   <div className="space-y-2">
                     <Label>Observações de Validação</Label>
@@ -388,4 +398,4 @@ export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
       </DialogContent>
     </Dialog>
   );
-}
+};
