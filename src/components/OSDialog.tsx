@@ -1,8 +1,9 @@
 // src/components/OSDialog.tsx
-import { useState, useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getOS } from "@/lib/api";
+import { getOS, assignOSExecutor, setOSStatus, validateOS, uploadOSPdf } from "@/lib/api";
+
 import {
   Dialog,
   DialogContent,
@@ -12,10 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "@/components/ui/use-toast";
+
 import {
   ClipboardList,
   Calendar,
@@ -24,6 +28,7 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
+  Upload,
 } from "lucide-react";
 
 interface OSDialogProps {
@@ -32,17 +37,20 @@ interface OSDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
+export default function OSDialog({ osId, open, onOpenChange }: OSDialogProps) {
   const [observacoes, setObservacoes] = useState("");
+  const [executorNome, setExecutorNome] = useState("");
+  const [executorContato, setExecutorContato] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  // Busca básica da OS (sem joins pesados)
-  const { data: os, isLoading } = useQuery({
+  // Busca enxuta da OS
+  const { data: os, isLoading, refetch } = useQuery({
     queryKey: ["os", osId],
     queryFn: async () => await getOS(osId),
     enabled: open && !!osId,
   });
 
-  // Hidrata o ativo de forma leve (opcional e segura)
+  // Hidrata o ativo leve (id, nome, local)
   const { data: ativo } = useQuery({
     queryKey: ["os-ativo", os?.ativo_id],
     queryFn: async () => {
@@ -58,7 +66,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     enabled: open && !!os?.ativo_id,
   });
 
-  // PDF (assinado) se existir
+  // PDF assinado, se existir
   const { data: pdfUrl } = useQuery({
     queryKey: ["os-pdf", os?.pdf_path],
     queryFn: async () => {
@@ -73,6 +81,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     enabled: open && !!os?.pdf_path,
   });
 
+  // Derivados seguros
   const checklist: any[] = useMemo(() => {
     if (!os?.checklist) return [];
     return Array.isArray(os.checklist) ? os.checklist : [];
@@ -81,7 +90,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
   const status = String(os?.status ?? "aberta");
   const prioridade = os?.prioridade ? String(os.prioridade) : undefined;
   const origem = os?.origem ? String(os.origem) : undefined;
-  const tipoExecutor = os?.tipo_executor ? String(os.tipo_executor) : undefined;
+  const tipoExecutor = (os as any)?.tipo_executor ? String((os as any).tipo_executor) : undefined;
 
   const getStatusColor = (s: string) => {
     switch (s) {
@@ -89,6 +98,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
       case "fechada":
         return "bg-green-500/10 text-green-700";
       case "aberta":
+      case "em andamento":
       case "em_execucao":
         return "bg-yellow-500/10 text-yellow-700";
       case "aguardando_validacao":
@@ -106,6 +116,32 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
     const n = typeof v === "string" ? Number(v) : v;
     if (Number.isNaN(n)) return "-";
     return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  };
+
+  // Ações
+  const doAssign = async () => {
+    if (!executorNome) return;
+    await assignOSExecutor(osId, executorNome, executorContato || null);
+    toast?.({ title: "Executor atribuído" });
+    await refetch();
+  };
+
+  const doValidate = async (aprovado: boolean) => {
+    await validateOS(osId, aprovado, observacoes || null);
+    toast?.({ title: aprovado ? "OS aprovada" : "OS reprovada" });
+    onOpenChange(false);
+  };
+
+  const doConcluir = async () => {
+    await setOSStatus(osId, "concluida");
+    toast?.({ title: "OS concluída" });
+    onOpenChange(false);
+  };
+
+  const doUpload = async (file: File) => {
+    const { url } = await uploadOSPdf(osId, file);
+    if (url) toast?.({ title: "Documento anexado" });
+    await refetch();
   };
 
   if (!open) return null;
@@ -174,7 +210,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                         <p className="text-xs text-muted-foreground">Local: {ativo.local}</p>
                       )}
                     </div>
-                </div>
+                  </div>
                 )}
 
                 <Separator />
@@ -223,7 +259,36 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                   </div>
                 </div>
 
-                {/* Observações (opção para validação) */}
+                {/* Atribuir executor (quando aberta) */}
+                {status === "aberta" && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Atribuir Executor</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        placeholder="Nome do executor"
+                        value={executorNome}
+                        onChange={(e) => setExecutorNome(e.target.value)}
+                      />
+                      <Input
+                        placeholder="Contato (opcional)"
+                        value={executorContato}
+                        onChange={(e) => setExecutorContato(e.target.value)}
+                      />
+                    </div>
+                    <Button className="mt-1" onClick={doAssign} disabled={!executorNome}>
+                      Iniciar execução
+                    </Button>
+                  </div>
+                )}
+
+                {/* Concluir (quando em andamento) */}
+                {(status === "em andamento" || status === "em_execucao") && (
+                  <Button className="w-full" onClick={doConcluir}>
+                    Marcar como concluída
+                  </Button>
+                )}
+
+                {/* Validação (quando aguardando_validacao) */}
                 {status === "aguardando_validacao" && (
                   <div className="space-y-2">
                     <Label>Observações de Validação</Label>
@@ -233,11 +298,15 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                       onChange={(e) => setObservacoes(e.target.value)}
                     />
                     <div className="flex gap-2">
-                      <Button className="flex-1 gap-2">
+                      <Button className="flex-1 gap-2" onClick={() => doValidate(true)}>
                         <CheckCircle2 className="h-4 w-4" />
                         Aprovar
                       </Button>
-                      <Button className="flex-1 gap-2" variant="destructive">
+                      <Button
+                        className="flex-1 gap-2"
+                        variant="destructive"
+                        onClick={() => doValidate(false)}
+                      >
                         <XCircle className="h-4 w-4" />
                         Reprovar
                       </Button>
@@ -276,6 +345,7 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                   <FileText className="h-4 w-4" />
                   Documentos
                 </Label>
+
                 {os.pdf_path ? (
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-2">
@@ -291,6 +361,26 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
                 ) : (
                   <p className="text-sm text-muted-foreground">Nenhum documento anexado</p>
                 )}
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) await doUpload(f);
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload de Documento (PDF/Imagem)
+                </Button>
               </div>
             </TabsContent>
           </Tabs>
@@ -298,4 +388,4 @@ export const OSDialog = ({ osId, open, onOpenChange }: OSDialogProps) => {
       </DialogContent>
     </Dialog>
   );
-};
+}
