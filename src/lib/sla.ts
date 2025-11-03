@@ -1,3 +1,4 @@
+// src/lib/sla.ts
 export const SLA_MAP: Record<"A" | "B" | "C", number> = {
   A: 4,
   B: 24,
