@@ -1248,12 +1248,13 @@ export async function setOSStatus(id: string, status: OSStatus) {
     .update(patch)
     .eq("id", id)
     .select("*")
-    .limit(1);
+    .single(); // << evita 400
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
+
 
 /** Validação: aprovado -> concluída; reprovado -> em andamento (guarda observações se existir) */
 export async function validateOS(
