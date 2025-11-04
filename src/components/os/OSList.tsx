@@ -44,6 +44,8 @@ import {
   Clock,
   XCircle,
 } from "lucide-react";
+import OsForm from "@/components/os/OsForm";
+import { toast } from "@/hooks/use-toast";
 
 /** ===== Utils locais ===== */
 function cls(...a: Array<string | false | null | undefined>) {
@@ -149,6 +151,14 @@ const OSList = forwardRef<OSListHandle, OSListProps>(function OSList(_props, ref
     try {
       await updateOS(id, { status: novo });
       await refresh();
+    } catch (error: any) {
+      const payloadPreview = JSON.stringify({ id, status: novo }).slice(0, 200) + "...";
+      console.error("Falha ao alterar status:", error);
+      toast({
+        title: "Erro ao alterar status",
+        description: `${error?.message || "Falha desconhecida"}\nPayload: ${payloadPreview}`,
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -378,43 +388,15 @@ const OSList = forwardRef<OSListHandle, OSListProps>(function OSList(_props, ref
           <DialogHeader>
             <DialogTitle>Nova Ordem de Serviço</DialogTitle>
           </DialogHeader>
-        <form onSubmit={handleCreate} className="grid gap-3">
-            <div>
-              <Label htmlFor="titulo">Título</Label>
-              <Input
-                id="titulo"
-                required
-                value={form.titulo ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, titulo: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="descricao">Descrição</Label>
-              <textarea
-                id="descricao"
-                className="border rounded w-full p-2 text-sm"
-                rows={3}
-                value={form.descricao ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, descricao: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label htmlFor="responsavel">Responsável</Label>
-              <Input
-                id="responsavel"
-                value={form.responsavel ?? ""}
-                onChange={(e) => setForm((s) => ({ ...s, responsavel: e.target.value }))}
-              />
-            </div>
-            <DialogFooter className="mt-2">
-              <Button type="button" variant="outline" onClick={() => setOpenForm(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                Criar
-              </Button>
-            </DialogFooter>
-          </form>
+          <OsForm
+            mode="create"
+            onCreated={async () => {
+              toast({ title: "OS criada com sucesso" });
+              setOpenForm(false);
+              await refresh();
+            }}
+            onCancel={() => setOpenForm(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

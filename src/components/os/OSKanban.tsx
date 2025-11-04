@@ -5,6 +5,7 @@ import { listOS, updateOS, OSRow, OSStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, RefreshCw } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 
 /** Colunas do Kanban na ordem desejada */
 const COLUMNS: Array<{ key: OSStatus; title: string }> = [
@@ -79,10 +80,16 @@ export default function OSKanban() {
     setSavingId(osId);
     try {
       await updateOS(osId, { status: newStatus });
-    } catch (err) {
+    } catch (err: any) {
       // rollback em caso de erro
       setItems(prev => prev.map(i => i.id === osId ? { ...i, status: current.status } : i));
+      const payloadPreview = JSON.stringify({ id: osId, status: newStatus }).slice(0, 200) + "...";
       console.error("Falha ao alterar status:", err);
+      toast({
+        title: "Erro ao alterar status",
+        description: `${err?.message || "Falha desconhecida"}\nPayload: ${payloadPreview}`,
+        variant: "destructive",
+      });
     } finally {
       setSavingId(null);
     }
