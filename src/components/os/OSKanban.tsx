@@ -46,6 +46,7 @@ export default function OSKanban() {
     const map: Record<OSStatus, OSRow[]> = {
       "aberta": [],
       "em andamento": [],
+      "aguardando_validacao": [],
       "concluida": [],
       "cancelada": [],
     };

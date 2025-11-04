@@ -942,6 +942,7 @@ export type OSStatus =
 
 export type OSRow = {
   id: string;
+  numero?: string | null;
   titulo: string;
   descricao?: string | null;
   status: OSStatus;
@@ -949,12 +950,15 @@ export type OSRow = {
   ativo_id?: string | null;
   condominio_id?: string | null;
 
+  origem?: string | null;           // preventiva/chamado/legal
   tipo_manutencao?: string | null;  // preventiva/corretiva/preditiva
   prioridade?: string | null;       // baixa/media/alta/urgente
   data_prevista?: string | null;    // ISO 'YYYY-MM-DD'
 
   fornecedor_nome?: string | null;
   fornecedor_contato?: string | null;
+
+  checklist?: any[] | null;
 
   created_at?: string | null;
   updated_at?: string | null;
