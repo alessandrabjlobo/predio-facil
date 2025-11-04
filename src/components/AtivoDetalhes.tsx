@@ -1,4 +1,5 @@
-import { useState } from "react";
+// FILE: src/components/AtivoDetalhes.tsx
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// ⬇️ IMPORTANTE: trazer o formulário completo de OS
+import OsForm from "@/components/os/OsForm";
+
 interface AtivoDetalhesProps {
   ativoId: string;
   open: boolean;
@@ -35,11 +39,11 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
   const queryClient = useQueryClient();
   const { updateAtivo, deleteAtivo } = useAtivos();
   const { role } = useUserRole();
-  const [saving, setSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
-  const canEditOrDelete = role === 'admin' || role === 'sindico';
-  
+  const [openOsForm, setOpenOsForm] = useState(false);
+
+  const canEditOrDelete = role === "admin" || role === "sindico";
+
   // Buscar dados do ativo
   const { data: ativo, isLoading } = useQuery({
     queryKey: ["ativo-detalhes", ativoId],
@@ -49,7 +53,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
         .select("*, ativo_tipos(nome)")
         .eq("id", ativoId)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -64,7 +68,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
         .from("ativo_historico_manutencao")
         .select("*")
         .eq("ativo_id", ativoId);
-      
+
       if (error) throw error;
       return data;
     },
@@ -80,7 +84,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
         .select("*")
         .eq("ativo_id", ativoId)
         .order("proxima_execucao", { ascending: true });
-      
+
       if (error) throw error;
       return data;
     },
@@ -102,8 +106,8 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
     observacoes: "",
   });
 
-  // Atualizar formData quando ativo carregar
-  useState(() => {
+  // ✅ Sincroniza o form com o ativo carregado (corrige uso anterior de useState como efeito)
+  useEffect(() => {
     if (ativo) {
       setFormData({
         nome: ativo.nome || "",
@@ -120,13 +124,15 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
         observacoes: ativo.observacoes || "",
       });
     }
-  });
+  }, [ativo]);
 
   const handleSave = () => {
     updateAtivo.mutate(
       { id: ativoId, updates: formData },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: ["ativo-detalhes", ativoId] });
+          toast({ title: "Ativo atualizado com sucesso" });
           onOpenChange(false);
         },
       }
@@ -135,7 +141,9 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
 
   const handleDelete = () => {
     deleteAtivo.mutate(ativoId, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: ["ativos"] });
+        toast({ title: "Ativo excluído" });
         onOpenChange(false);
         setShowDeleteDialog(false);
       },
@@ -187,7 +195,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
                   onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="identificador">Identificador (ex: Elevador 1)</Label>
                 <Input
@@ -241,8 +249,8 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
 
               <div className="space-y-2">
                 <Label htmlFor="tipo_uso">Tipo de Uso</Label>
-                <Select 
-                  value={formData.tipo_uso} 
+                <Select
+                  value={formData.tipo_uso}
                   onValueChange={(value) => setFormData({ ...formData, tipo_uso: value })}
                 >
                   <SelectTrigger id="tipo_uso">
@@ -352,7 +360,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
                     const proximaData = new Date(plano.proxima_execucao);
                     const hoje = new Date();
                     const diasAteVencer = Math.floor((proximaData.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
-                    
+
                     return (
                       <div key={plano.id} className="flex items-center justify-between p-3 border rounded hover:bg-accent/50">
                         <div className="flex-1">
@@ -363,7 +371,7 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-medium">
-                            {proximaData.toLocaleDateString('pt-BR')}
+                            {proximaData.toLocaleDateString("pt-BR")}
                           </p>
                           {diasAteVencer > 0 && diasAteVencer <= 15 && (
                             <Badge variant="secondary" className="text-xs">
@@ -426,8 +434,8 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
           <div className="flex justify-between pt-4">
             <div>
               {canEditOrDelete && (
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   onClick={() => setShowDeleteDialog(true)}
                   className="gap-2"
                 >
@@ -437,14 +445,17 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
               )}
             </div>
             <div className="flex gap-2">
+              {/* Botão para abrir o formulário COMPLETO de OS */}
+              {canEditOrDelete && (
+                <Button variant="outline" onClick={() => setOpenOsForm(true)}>
+                  Gerar OS
+                </Button>
+              )}
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               {canEditOrDelete && (
-                <Button 
-                  onClick={handleSave} 
-                  disabled={updateAtivo.isPending}
-                >
+                <Button onClick={handleSave} disabled={updateAtivo.isPending}>
                   {updateAtivo.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar Alterações
                 </Button>
@@ -454,12 +465,38 @@ export function AtivoDetalhes({ ativoId, open, onOpenChange }: AtivoDetalhesProp
         </div>
       </DialogContent>
 
+      {/* Dialog com o OsForm completo */}
+      <Dialog open={openOsForm} onOpenChange={setOpenOsForm}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nova Ordem de Serviço</DialogTitle>
+            <DialogDescription>Crie a OS completa vinculada a este ativo.</DialogDescription>
+          </DialogHeader>
+          <OsForm
+            mode="create"
+            initial={{
+              ativo_id: ativoId,
+              titulo: ativo?.nome ? `Manutenção - ${ativo.nome}` : "",
+              tipo_manutencao: "preventiva",
+              prioridade: "media",
+            }}
+            onCreated={async () => {
+              toast({ title: "OS criada com sucesso" });
+              setOpenOsForm(false);
+              // opcional: invalida listas relacionadas
+              await queryClient.invalidateQueries({ queryKey: ["os"] });
+            }}
+            onCancel={() => setOpenOsForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O ativo "{ativo?.nome}" será permanentemente excluído 
+              Esta ação não pode ser desfeita. O ativo "{ativo?.nome}" será permanentemente excluído
               do sistema, incluindo todo o histórico de manutenções associado.
             </AlertDialogDescription>
           </AlertDialogHeader>
