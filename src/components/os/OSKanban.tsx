@@ -1,7 +1,7 @@
 // FILE: src/components/os/OSKanban.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { listOS, updateOS, OSRow, OSStatus } from "@/lib/api";
+import { listOS, setOSStatus, type OSRow, type OSStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -15,9 +15,7 @@ const COLUMNS: Array<{ key: OSStatus; title: string }> = [
   { key: "cancelada",     title: "Cancelada" },
 ];
 
-type DragState = {
-  osId: string | null;
-};
+type DragState = { osId: string | null };
 
 export default function OSKanban() {
   const [params] = useSearchParams();
@@ -33,15 +31,19 @@ export default function OSKanban() {
     try {
       const data = await listOS(ativoFilter ? ({ ativo_id: ativoFilter } as any) : undefined);
       setItems(data);
+    } catch (e: any) {
+      console.error(e);
+      toast({
+        variant: "destructive",
+        title: "Erro ao carregar OS",
+        description: e?.message ?? "Falha inesperada",
+      });
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ativoFilter]);
+  useEffect(() => { refresh(); /* eslint-disable-next-line */ }, [ativoFilter]);
 
   const byColumn = useMemo(() => {
     const map: Record<OSStatus, OSRow[]> = {
@@ -53,7 +55,7 @@ export default function OSKanban() {
     };
     for (const r of items) {
       const s = (r.status ?? "aberta") as OSStatus;
-      map[s].push(r);
+      map[s]?.push(r);
     }
     return map;
   }, [items]);
@@ -63,9 +65,7 @@ export default function OSKanban() {
     e.dataTransfer.setData("text/plain", osId);
     setDrag({ osId });
   }
-  function onDragOver(e: React.DragEvent) {
-    e.preventDefault(); // necessário para permitir drop
-  }
+  function onDragOver(e: React.DragEvent) { e.preventDefault(); }
   async function onDrop(e: React.DragEvent, newStatus: OSStatus) {
     e.preventDefault();
     const osId = e.dataTransfer.getData("text/plain") || drag.osId;
@@ -79,9 +79,9 @@ export default function OSKanban() {
     setItems(prev => prev.map(i => i.id === osId ? { ...i, status: newStatus } : i));
     setSavingId(osId);
     try {
-      await updateOS(osId, { status: newStatus });
+      await setOSStatus(osId, newStatus);
     } catch (err: any) {
-      // rollback em caso de erro
+      // rollback
       setItems(prev => prev.map(i => i.id === osId ? { ...i, status: current.status } : i));
       const payloadPreview = JSON.stringify({ id: osId, status: newStatus }).slice(0, 200) + "...";
       console.error("Falha ao alterar status:", err);
@@ -101,9 +101,7 @@ export default function OSKanban() {
         <div className="text-sm text-muted-foreground">
           {ativoFilter ? (
             <>Filtrando por ativo: <span className="font-medium">{ativoFilter}</span></>
-          ) : (
-            <>Arraste as OS entre as colunas para mudar o status.</>
-          )}
+          ) : (<>Arraste as OS entre as colunas para mudar o status.</>)}
         </div>
         <Button size="sm" variant="outline" onClick={refresh} title="Recarregar">
           <RefreshCw className="h-4 w-4 mr-2" />
