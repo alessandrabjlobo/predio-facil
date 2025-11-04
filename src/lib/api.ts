@@ -1041,17 +1041,19 @@ export async function getOS(id: string) {
     .from("os")
     .select("*")
     .eq("id", id)
-    .limit(1);
+    .maybeSingle();      // ← sem limit(1)
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
-  if (!r) throw new Error("OS não encontrada");
+  if (!data) throw new Error("OS não encontrada");
+
+  const r: any = data;
   return {
     ...r,
     status: osNormalizeStatus(r.status),
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
+
 
 /** Cria OS e faz patch de campos opcionais se existirem */
 export async function createOS(payload: {
