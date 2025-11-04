@@ -103,6 +103,7 @@ function normalizeTipoManutencao(t?: string | null): "preventiva"|"corretiva"|"p
 }
 
 /** status: UI usa "em andamento"; DB tem CHECK específico (com espaço) */
+/** status mostrado na UI */
 export type OSStatus =
   | "aberta"
   | "em andamento"
@@ -110,6 +111,7 @@ export type OSStatus =
   | "concluida"
   | "cancelada";
 
+/** normaliza o que vem do DB para exibir na UI */
 function osNormalizeStatus(s?: string | null): OSStatus {
   const k = (s ?? "").toLowerCase().trim();
   if (k === "em_andamento" || k === "em andamento") return "em andamento";
@@ -119,12 +121,15 @@ function osNormalizeStatus(s?: string | null): OSStatus {
   return "aberta";
 }
 
-/** encode para DB respeitando o CHECK (usa espaço em "em andamento") */
-function osDbEncodeStatus(s: OSStatus): string {
-  if (s === "em andamento") return "em andamento";
-  if (s === "aguardando_validacao") return "aguardando_validacao";
-  return s;
+/** 🚨 encode para o DB (usa UNDERSCORE onde o CHECK exige) */
+function osDbEncodeStatus(s: OSStatus | string): string {
+  const k = (s ?? "aberta").toString().toLowerCase().trim();
+  if (k === "em andamento" || k === "em_andamento") return "em_andamento";
+  if (k === "aguardando validacao" || k === "aguardando_validacao") return "aguardando_validacao";
+  // "aberta", "concluida", "cancelada" já estão no formato esperado
+  return k;
 }
+
 
 /** força 'YYYY-MM-DD' */
 function toISODateOnly(d?: string | null) {
