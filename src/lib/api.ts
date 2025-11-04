@@ -1250,29 +1250,119 @@ export async function createOS(payload: {
 
 export async function updateOS(
   id: string,
-  patch: Partial<
-    Pick<OSRow, "titulo" | "descricao" | "responsavel" | "status" | "ativo_id" | "prioridade" | "tipo_manutencao" | "data_prevista">
-  >
+  patch: Partial<{
+    // básicos
+    titulo: string;
+    descricao: string | null;
+    responsavel: string | null;
+    status: OSStatus | string;
+    ativo_id: string | null;
+    prioridade: "baixa" | "media" | "alta" | "urgente" | string | null;
+    tipo_manutencao: "preventiva" | "corretiva" | "preditiva" | string | null;
+    data_prevista: string | null; // "YYYY-MM-DD"
+
+    // identificação / origem
+    solicitante_nome: string | null;
+    solicitante_contato: string | null;
+    aprovador_nome: string | null;
+    origem: string | null;
+
+    // escopo / checklist / recursos
+    escopo: string | null;
+    checklist: Array<{ item: string; obrigatorio?: boolean }> | null;
+    materiais: Array<{ descricao: string; qtd: number; unidade?: string }> | null;
+    equipe: Array<{ funcao: string; nome?: string; carga_horas?: number }> | null;
+
+    // segurança / PT
+    risco_nivel: "baixo" | "medio" | "alto" | null | string;
+    riscos_identificados: string | null;
+    epi_lista: string[] | null;
+    pt_numero: string | null;
+    pt_tipo: string | null;
+
+    // prazos / SLA
+    sla_inicio: string | null; // "YYYY-MM-DD"
+    sla_fim: string | null;    // "YYYY-MM-DD"
+
+    // custos
+    custo_estimado: number | null;
+    custo_materiais: number | null;
+    custo_total: number | null;
+
+    // fornecedor
+    fornecedor_nome: string | null;
+    fornecedor_contato: string | null;
+
+    // aceite / validação
+    aceite_responsavel: string | null;
+    aceite_data: string | null; // "YYYY-MM-DD"
+    validacao_obs: string | null;
+
+    // evidências
+    fotos_antes: Array<{ path: string; legenda?: string }> | null;
+    fotos_depois: Array<{ path: string; legenda?: string }> | null;
+  }>
 ) {
   const upd: any = {};
+
+  // básicos
   if (typeof patch.titulo !== "undefined") upd.titulo = patch.titulo ?? null;
-  if (typeof patch.descricao !== "undefined")
-    upd.descricao = patch.descricao ?? null;
-  if (typeof patch.responsavel !== "undefined")
-    upd.responsavel = patch.responsavel ?? null;
+  if (typeof patch.descricao !== "undefined") upd.descricao = patch.descricao ?? null;
+  if (typeof patch.responsavel !== "undefined") upd.responsavel = patch.responsavel ?? null;
   if (typeof patch.ativo_id !== "undefined") upd.ativo_id = patch.ativo_id ?? null;
 
   if (typeof patch.status !== "undefined")
     upd.status = osDbEncodeStatus(patch.status as OSStatus);
 
   if (typeof patch.prioridade !== "undefined")
-    upd.prioridade = normalizeOsPrioridade(patch.prioridade) ?? null;
+    upd.prioridade = normalizeOsPrioridade(patch.prioridade as string) ?? null;
 
   if (typeof patch.tipo_manutencao !== "undefined")
-    upd.tipo_manutencao = normalizeTipoManutencao(patch.tipo_manutencao) ?? null;
+    upd.tipo_manutencao = normalizeTipoManutencao(patch.tipo_manutencao as string) ?? null;
 
   if (typeof patch.data_prevista !== "undefined")
-    upd.data_prevista = toISODateOnly(patch.data_prevista);
+    upd.data_prevista = toISODateOnly(patch.data_prevista ?? null);
+
+  // identificação / origem
+  if (typeof patch.solicitante_nome !== "undefined") upd.solicitante_nome = patch.solicitante_nome;
+  if (typeof patch.solicitante_contato !== "undefined") upd.solicitante_contato = patch.solicitante_contato;
+  if (typeof patch.aprovador_nome !== "undefined") upd.aprovador_nome = patch.aprovador_nome;
+  if (typeof patch.origem !== "undefined") upd.origem = patch.origem;
+
+  // escopo / checklist / recursos (JSONB)
+  if (typeof patch.escopo !== "undefined") upd.escopo = patch.escopo;
+  if (typeof patch.checklist !== "undefined") upd.checklist = patch.checklist ?? null;
+  if (typeof patch.materiais !== "undefined") upd.materiais = patch.materiais ?? null;
+  if (typeof patch.equipe !== "undefined") upd.equipe = patch.equipe ?? null;
+
+  // segurança / PT
+  if (typeof patch.risco_nivel !== "undefined") upd.risco_nivel = patch.risco_nivel ?? null;
+  if (typeof patch.riscos_identificados !== "undefined") upd.riscos_identificados = patch.riscos_identificados ?? null;
+  if (typeof patch.epi_lista !== "undefined") upd.epi_lista = patch.epi_lista ?? null;
+  if (typeof patch.pt_numero !== "undefined") upd.pt_numero = patch.pt_numero ?? null;
+  if (typeof patch.pt_tipo !== "undefined") upd.pt_tipo = patch.pt_tipo ?? null;
+
+  // prazos / SLA
+  if (typeof patch.sla_inicio !== "undefined") upd.sla_inicio = toISODateOnly(patch.sla_inicio ?? null);
+  if (typeof patch.sla_fim !== "undefined")    upd.sla_fim    = toISODateOnly(patch.sla_fim ?? null);
+
+  // custos
+  if (typeof patch.custo_estimado !== "undefined") upd.custo_estimado = patch.custo_estimado ?? null;
+  if (typeof patch.custo_materiais !== "undefined") upd.custo_materiais = patch.custo_materiais ?? null;
+  if (typeof patch.custo_total !== "undefined") upd.custo_total = patch.custo_total ?? null;
+
+  // fornecedor
+  if (typeof patch.fornecedor_nome !== "undefined") upd.fornecedor_nome = patch.fornecedor_nome ?? null;
+  if (typeof patch.fornecedor_contato !== "undefined") upd.fornecedor_contato = patch.fornecedor_contato ?? null;
+
+  // aceite / validação
+  if (typeof patch.aceite_responsavel !== "undefined") upd.aceite_responsavel = patch.aceite_responsavel ?? null;
+  if (typeof patch.aceite_data !== "undefined") upd.aceite_data = toISODateOnly(patch.aceite_data ?? null);
+  if (typeof patch.validacao_obs !== "undefined") upd.validacao_obs = patch.validacao_obs ?? null;
+
+  // evidências
+  if (typeof patch.fotos_antes !== "undefined") upd.fotos_antes = patch.fotos_antes ?? null;
+  if (typeof patch.fotos_depois !== "undefined") upd.fotos_depois = patch.fotos_depois ?? null;
 
   upd.updated_at = new Date().toISOString();
 
@@ -1284,6 +1374,7 @@ export async function updateOS(
     .limit(1);
 
   if (error) throw error;
+
   const r: any = (data ?? [])[0];
   return {
     ...r,
