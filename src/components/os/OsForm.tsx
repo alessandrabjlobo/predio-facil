@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 
 import { createOS, updateOS, type OSRow } from "@/lib/api";
 import { normalizeOsFormValues } from "@/utils/os-normalize";
+import { useCondominioAtual } from "@/hooks/useCondominioAtual";
 
 const schema = z.object({
   titulo: z.string().min(1, "Informe um título"),
@@ -21,12 +22,11 @@ const schema = z.object({
   ativo_id: z.string().optional().nullable(),
   tipo_manutencao: z.enum(["preventiva", "corretiva", "preditiva"]),
   prioridade: z.enum(["baixa", "media", "alta", "urgente"]),
-  data_prevista: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use o formato AAAA-MM-DD").nullable().optional(),
+  data_prevista: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use AAAA-MM-DD").nullable().optional(),
   responsavel: z.string().optional().nullable(),
   fornecedor_toggle: z.boolean().default(false),
   fornecedor_nome: z.string().optional().nullable(),
   fornecedor_contato: z.string().optional().nullable(),
-  condominio_id: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -40,6 +40,8 @@ type Props = {
 };
 
 export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }: Props) {
+  const { condominioId } = useCondominioAtual();
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -53,12 +55,10 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
       fornecedor_toggle: !!(initial?.fornecedor_nome || initial?.fornecedor_contato),
       fornecedor_nome: initial?.fornecedor_nome ?? "",
       fornecedor_contato: initial?.fornecedor_contato ?? "",
-      condominio_id: (initial as any)?.condominio_id ?? null,
     },
     mode: "onSubmit",
   });
 
-  // Se o usuário desliga o fornecedor, limpamos campos
   useEffect(() => {
     const sub = form.watch((values, { name }) => {
       if (name === "fornecedor_toggle" && !values.fornecedor_toggle) {
@@ -71,21 +71,20 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
 
   async function handleSubmit(raw: FormData) {
     try {
-      // Normalização extra de segurança (além do zod):
       const norm = normalizeOsFormValues({
         tipo_manutencao: raw.tipo_manutencao,
         prioridade: raw.prioridade,
-        data_prevista: raw.data_prevista,
+        data_prevista: raw.data_prevista || "",
       });
 
       const payload = {
         titulo: raw.titulo,
         descricao: raw.descricao ?? null,
         ativo_id: raw.ativo_id ?? null,
-        condominio_id: raw.condominio_id ?? null,
-        tipo_manutencao: norm.tipo_manutencao, // "preventiva" | "corretiva" | "preditiva"
-        prioridade: norm.prioridade,           // "baixa" | "media" | "alta" | "urgente"
-        data_prevista: norm.data_prevista,     // "YYYY-MM-DD" | null
+        condominio_id: condominioId ?? null,
+        tipo_manutencao: norm.tipo_manutencao,
+        prioridade: norm.prioridade,
+        data_prevista: norm.data_prevista, // null se vazio
         responsavel: raw.responsavel ?? null,
         fornecedor_nome: raw.fornecedor_toggle ? (raw.fornecedor_nome || null) : null,
         fornecedor_contato: raw.fornecedor_toggle ? (raw.fornecedor_contato || null) : null,
@@ -107,14 +106,9 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
         onUpdated?.(updated);
       }
     } catch (error: any) {
-      // Mostra mensagem útil + payload (resumo) para debug
       const payloadPreview = (() => {
-        try {
-          const p = form.getValues();
-          return JSON.stringify(p, null, 2).slice(0, 400) + "...";
-        } catch {
-          return "(payload indisponível)";
-        }
+        try { return JSON.stringify(form.getValues(), null, 2).slice(0, 400) + "..."; }
+        catch { return "(payload indisponível)"; }
       })();
       console.error("Falha ao salvar OS:", error);
       toast({
@@ -126,10 +120,7 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
   }
 
   return (
-    <form
-      onSubmit={form.handleSubmit(handleSubmit)}
-      className="space-y-4"
-    >
+    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
       <div className="space-y-2">
         <Label>Título da OS *</Label>
         <Input {...form.register("titulo")} placeholder="Ex.: Manutenção - Rampa Garagem" />
@@ -140,7 +131,7 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
 
       <div className="space-y-2">
         <Label>Descrição Detalhada</Label>
-        <Textarea {...form.register("descricao")} placeholder="Descreva os serviços a serem realizados..." rows={4} />
+        <Textarea {...form.register("descricao")} placeholder="Descreva os serviços..." rows={4} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -180,7 +171,7 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
           <Input
             type="date"
             {...form.register("data_prevista")}
-            onChange={(e) => form.setValue("data_prevista", e.target.value as any)}
+            onChange={(e) => form.setValue("data_prevista", (e.target.value || null) as any)}
           />
         </div>
       </div>
