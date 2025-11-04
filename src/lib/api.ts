@@ -1003,6 +1003,7 @@ export async function adiarProximoConformidade(
 
 export type OSRow = {
   id: string;
+  numero?: string | null;           // numero sequencial da OS
   titulo: string;
   descricao?: string | null;
   status: OSStatus;
@@ -1013,9 +1014,12 @@ export type OSRow = {
   tipo_manutencao?: string | null;  // preventiva/corretiva/preditiva
   prioridade?: string | null;       // baixa/media/alta/urgente
   data_prevista?: string | null;    // ISO 'YYYY-MM-DD'
+  origem?: string | null;           // "preventiva" | "corretiva" | origem da OS
 
   fornecedor_nome?: string | null;
   fornecedor_contato?: string | null;
+
+  checklist?: any[] | null;         // checklist items
 
   created_at?: string | null;
   updated_at?: string | null;
