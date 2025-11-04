@@ -343,7 +343,7 @@ export async function createAtivo(payload: {
           const { error: eIns } = await supabase
             .from("planos_manutencao")
             .insert(r as any);
-        if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
+          if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
         }
       }
     }
@@ -1041,12 +1041,11 @@ export async function getOS(id: string) {
     .from("os")
     .select("*")
     .eq("id", id)
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
 
   if (error) throw error;
-  if (!data) throw new Error("OS não encontrada");
-  const r: any = data;
+  const r: any = (data ?? [])[0];
+  if (!r) throw new Error("OS não encontrada");
   return {
     ...r,
     status: osNormalizeStatus(r.status),
@@ -1130,10 +1129,11 @@ export async function updateOS(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
+
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return {
     ...r,
     status: osNormalizeStatus(r.status),
@@ -1160,11 +1160,11 @@ export async function assignOSExecutor(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
 
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1177,10 +1177,11 @@ export async function setOSStatus(id: string, status: OSStatus) {
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
+
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1201,10 +1202,11 @@ export async function validateOS(
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
+
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
