@@ -942,7 +942,6 @@ export type OSStatus =
 
 export type OSRow = {
   id: string;
-  numero?: string | null;
   titulo: string;
   descricao?: string | null;
   status: OSStatus;
@@ -950,15 +949,12 @@ export type OSRow = {
   ativo_id?: string | null;
   condominio_id?: string | null;
 
-  origem?: string | null;           // preventiva/chamado/legal
   tipo_manutencao?: string | null;  // preventiva/corretiva/preditiva
   prioridade?: string | null;       // baixa/media/alta/urgente
   data_prevista?: string | null;    // ISO 'YYYY-MM-DD'
 
   fornecedor_nome?: string | null;
   fornecedor_contato?: string | null;
-
-  checklist?: any[] | null;
 
   created_at?: string | null;
   updated_at?: string | null;
@@ -1045,7 +1041,7 @@ export async function getOS(id: string) {
     .from("os")
     .select("*")
     .eq("id", id)
-    .maybeSingle();      // ← sem limit(1)
+    .maybeSingle();      // sem limit(1)
 
   if (error) throw error;
   if (!data) throw new Error("OS não encontrada");
@@ -1057,7 +1053,6 @@ export async function getOS(id: string) {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
-
 
 /** Cria OS e faz patch de campos opcionais se existirem */
 export async function createOS(payload: {
@@ -1135,11 +1130,11 @@ export async function updateOS(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select("*")
-    .limit(1);
+    .select()
+    .single();
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return {
     ...r,
     status: osNormalizeStatus(r.status),
@@ -1166,11 +1161,11 @@ export async function assignOSExecutor(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select("*")
-    .limit(1);
+    .select()
+    .single();
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1183,11 +1178,11 @@ export async function setOSStatus(id: string, status: OSStatus) {
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select("*")
-    .limit(1);
+    .select()
+    .single();
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1208,11 +1203,11 @@ export async function validateOS(
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select("*")
-    .limit(1);
+    .select()
+    .single();
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1301,7 +1296,6 @@ export async function getCondoConfig(): Promise<CondoConfig | null> {
     .from("condominio_config")
     .select("*")
     .order("updated_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
   if (error && status !== 406) throw error;
   return data ?? null;
@@ -1528,11 +1522,13 @@ export async function isConformidadeForTipo(
 
 export async function listLocais(): Promise<LocalRow[]> {
   const { data, error } = await supabase
+;  // deliberate line break to ensure correct paste
+  const res = await supabase
     .from("locais")
     .select("*")
     .order("nome", { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  if (res.error) throw res.error;
+  return res.data ?? [];
 }
 
 export async function createLocal(nome: string) {
