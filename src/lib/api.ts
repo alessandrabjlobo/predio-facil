@@ -1108,24 +1108,64 @@ export async function getOS(id: string) {
   } as OSRow;
 }
 
-/** Cria OS e normaliza campos para passar nos CHECKs */
+/** Cria OS (NBR 5674) e normaliza campos para passar nos CHECKs */
 export async function createOS(payload: {
+  // básicos
   titulo: string;
   descricao?: string | null;
   responsavel?: string | null;
   ativo_id?: string | null;
   condominio_id?: string | null;
-  tipo_manutencao?: string | null;
-  prioridade?: string | null;
-  data_prevista?: string | null;
+  tipo_manutencao?: string | null; // "preventiva" | "corretiva" | "preditiva"
+  prioridade?: string | null;      // "baixa" | "media" | "alta" | "urgente"
+  data_prevista?: string | null;   // "YYYY-MM-DD"
+
+  // identificação / origem
+  solicitante_nome?: string | null;
+  solicitante_contato?: string | null;
+  aprovador_nome?: string | null;
+  origem?: string | null;
+
+  // escopo / checklist / recursos
+  escopo?: string | null;
+  checklist?: Array<{ item: string; obrigatorio?: boolean }>;
+  materiais?: Array<{ descricao: string; qtd: number; unidade?: string }>;
+  equipe?: Array<{ funcao: string; nome?: string; carga_horas?: number }>;
+
+  // segurança / PT
+  risco_nivel?: "baixo" | "medio" | "alto" | null;
+  riscos_identificados?: string | null;
+  epi_lista?: string[];            // ex.: ["capacete","luvas"]
+  pt_numero?: string | null;
+  pt_tipo?: string | null;
+
+  // prazos / SLA
+  sla_inicio?: string | null;      // "YYYY-MM-DD"
+  sla_fim?: string | null;         // "YYYY-MM-DD"
+
+  // custos
+  custo_estimado?: number | null;
+  custo_materiais?: number | null;
+  custo_total?: number | null;
+
+  // fornecedor
   fornecedor_nome?: string | null;
   fornecedor_contato?: string | null;
-  origem?: string | null;
+
+  // aceite / validação
+  aceite_responsavel?: string | null;
+  aceite_data?: string | null;     // "YYYY-MM-DD"
+  validacao_obs?: string | null;
+
+  // registros / evidências (se já quiser salvar)
+  fotos_antes?: Array<{ path: string; legenda?: string }>;
+  fotos_depois?: Array<{ path: string; legenda?: string }>;
 }) {
   const prioridadeNorm = normalizeOsPrioridade(payload.prioridade) ?? null;
   const tipoNorm = normalizeTipoManutencao(payload.tipo_manutencao) ?? null;
   const dataPrev = toISODateOnly(payload.data_prevista);
 
+  // INSERT mínimo (garante passar nos CHECKs/NOT NULL)
   const safeInsert: any = {
     titulo: payload.titulo,
     descricao: payload.descricao ?? null,
@@ -1133,9 +1173,9 @@ export async function createOS(payload: {
     ativo_id: payload.ativo_id ?? null,
     condominio_id: payload.condominio_id ?? null,
     status: osDbEncodeStatus("aberta"),
-    prioridade: prioridadeNorm,         // passa no CHECK prioridade se existir
-    tipo_manutencao: tipoNorm,          // passa no CHECK tipo_manutencao se existir
-    data_prevista: dataPrev,            // 'YYYY-MM-DD'
+    prioridade: prioridadeNorm,          // passa no CHECK prioridade
+    tipo_manutencao: tipoNorm,           // passa no CHECK tipo_manutencao
+    data_prevista: dataPrev,             // 'YYYY-MM-DD' ou null
   };
 
   const { data, error } = await supabase
@@ -1146,16 +1186,56 @@ export async function createOS(payload: {
 
   if (error) throw error;
 
-  const patch: any = {};
-  if (payload.origem != null) patch.origem = payload.origem;
-  if (payload.fornecedor_nome != null) patch.fornecedor_nome = payload.fornecedor_nome;
-  if (payload.fornecedor_contato != null) patch.fornecedor_contato = payload.fornecedor_contato;
+  // UPDATE opcional com campos normativos (só aplica se existirem as colunas)
+  const extraPatch: any = {};
 
-  if (Object.keys(patch).length) {
+  // identificação / origem
+  if (payload.solicitante_nome != null) extraPatch.solicitante_nome = payload.solicitante_nome;
+  if (payload.solicitante_contato != null) extraPatch.solicitante_contato = payload.solicitante_contato;
+  if (payload.aprovador_nome != null) extraPatch.aprovador_nome = payload.aprovador_nome;
+  if (payload.origem != null) extraPatch.origem = payload.origem;
+
+  // escopo / checklist / recursos
+  if (payload.escopo != null) extraPatch.escopo = payload.escopo;
+  if (payload.checklist != null) extraPatch.checklist = payload.checklist;     // JSONB
+  if (payload.materiais != null) extraPatch.materiais = payload.materiais;     // JSONB
+  if (payload.equipe != null) extraPatch.equipe = payload.equipe;             // JSONB
+
+  // segurança / PT
+  if (payload.risco_nivel != null) extraPatch.risco_nivel = payload.risco_nivel;
+  if (payload.riscos_identificados != null) extraPatch.riscos_identificados = payload.riscos_identificados;
+  if (payload.epi_lista != null) extraPatch.epi_lista = payload.epi_lista;     // JSONB
+  if (payload.pt_numero != null) extraPatch.pt_numero = payload.pt_numero;
+  if (payload.pt_tipo != null) extraPatch.pt_tipo = payload.pt_tipo;
+
+  // prazos / SLA
+  if (payload.sla_inicio != null) extraPatch.sla_inicio = toISODateOnly(payload.sla_inicio);
+  if (payload.sla_fim != null) extraPatch.sla_fim = toISODateOnly(payload.sla_fim);
+
+  // custos
+  if (typeof payload.custo_estimado !== "undefined") extraPatch.custo_estimado = payload.custo_estimado ?? null;
+  if (typeof payload.custo_materiais !== "undefined") extraPatch.custo_materiais = payload.custo_materiais ?? null;
+  if (typeof payload.custo_total !== "undefined") extraPatch.custo_total = payload.custo_total ?? null;
+
+  // fornecedor
+  if (payload.fornecedor_nome != null) extraPatch.fornecedor_nome = payload.fornecedor_nome;
+  if (payload.fornecedor_contato != null) extraPatch.fornecedor_contato = payload.fornecedor_contato;
+
+  // aceite / validação
+  if (payload.aceite_responsavel != null) extraPatch.aceite_responsavel = payload.aceite_responsavel;
+  if (payload.aceite_data != null) extraPatch.aceite_data = toISODateOnly(payload.aceite_data);
+  if (payload.validacao_obs != null) extraPatch.validacao_obs = payload.validacao_obs;
+
+  // evidências (JSONB)
+  if (payload.fotos_antes != null) extraPatch.fotos_antes = payload.fotos_antes;
+  if (payload.fotos_depois != null) extraPatch.fotos_depois = payload.fotos_depois;
+
+  if (Object.keys(extraPatch).length) {
     try {
-      await supabase.from("os").update(patch).eq("id", (data as any).id);
-    } catch {
-      // colunas opcionais podem não existir ainda
+      await supabase.from("os").update(extraPatch).eq("id", (data as any).id);
+    } catch (e) {
+      // Se alguma coluna ainda não existe, apenas registra e segue
+      console.warn("Campos extras (opcionais) não aplicados:", (e as any)?.message);
     }
   }
 
@@ -1166,6 +1246,7 @@ export async function createOS(payload: {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
+
 
 export async function updateOS(
   id: string,
