@@ -72,6 +72,74 @@ function slugify(s: string) {
     .replace(/(^-|-$)+/g, "");
 }
 
+/* ===== Helpers específicos para OS ===== */
+
+/** remove emojis e normaliza rótulos para os CHECKs do DB */
+function cleanLabel(input?: string | null) {
+  if (!input) return "";
+  return input
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeOsPrioridade(p?: string | null): "baixa"|"media"|"alta"|"urgente"|null {
+  const k = cleanLabel(p);
+  if (k.includes("urg")) return "urgente";
+  if (k.includes("alta")) return "alta";
+  if (k.includes("med")) return "media";
+  if (k.includes("baix")) return "baixa";
+  return null;
+}
+
+function normalizeTipoManutencao(t?: string | null): "preventiva"|"corretiva"|"preditiva"|null {
+  const k = cleanLabel(t);
+  if (k.startsWith("prev")) return "preventiva";
+  if (k.startsWith("corr")) return "corretiva";
+  if (k.startsWith("pred")) return "preditiva";
+  return null;
+}
+
+/** status: UI usa "em andamento"; DB tem CHECK específico (com espaço) */
+export type OSStatus =
+  | "aberta"
+  | "em andamento"
+  | "aguardando_validacao"
+  | "concluida"
+  | "cancelada";
+
+function osNormalizeStatus(s?: string | null): OSStatus {
+  const k = (s ?? "").toLowerCase().trim();
+  if (k === "em_andamento" || k === "em andamento") return "em andamento";
+  if (k === "aguardando_validacao" || k === "aguardando validacao") return "aguardando_validacao";
+  if (k === "concluida") return "concluida";
+  if (k === "cancelada") return "cancelada";
+  return "aberta";
+}
+
+/** encode para DB respeitando o CHECK (usa espaço em "em andamento") */
+function osDbEncodeStatus(s: OSStatus): string {
+  if (s === "em andamento") return "em andamento";
+  if (s === "aguardando_validacao") return "aguardando_validacao";
+  return s;
+}
+
+/** força 'YYYY-MM-DD' */
+function toISODateOnly(d?: string | null) {
+  if (!d) return null;
+  try {
+    // aceita 'YYYY-MM-DD' direto
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return null;
+    return dt.toISOString().slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
 /* ===========================
  * Perfil
  * =========================== */
@@ -933,13 +1001,6 @@ export async function adiarProximoConformidade(
  * MÓDULO DE OS (Ordem de Serviço)
  * =========================== */
 
-export type OSStatus =
-  | "aberta"
-  | "em andamento"
-  | "aguardando_validacao"
-  | "concluida"
-  | "cancelada";
-
 export type OSRow = {
   id: string;
   titulo: string;
@@ -964,22 +1025,6 @@ export type OSRow = {
   pdf_path?: string | null;
   pdf_url?: string | null;
 };
-
-/** normaliza status vindo do DB */
-function osNormalizeStatus(s?: string | null): OSStatus {
-  const k = (s ?? "").toLowerCase().trim();
-  if (k === "em_andamento" || k === "em andamento") return "em andamento";
-  if (k === "aguardando_validacao" || k === "aguardando validacao") return "aguardando_validacao";
-  if (k === "concluida") return "concluida";
-  if (k === "cancelada") return "cancelada";
-  return "aberta";
-}
-
-/** encode para DB quando usa underscore */
-function osDbEncodeStatus(s: OSStatus): string {
-  if (s === "em andamento") return "em_andamento";
-  return s;
-}
 
 /** lista OS com fallback de ordenação caso 'created_at' não exista */
 export async function listOS(params?: {
@@ -1041,7 +1086,7 @@ export async function getOS(id: string) {
     .from("os")
     .select("*")
     .eq("id", id)
-    .maybeSingle();      // sem limit(1)
+    .maybeSingle(); // sem limit(1) aqui
 
   if (error) throw error;
   if (!data) throw new Error("OS não encontrada");
@@ -1054,7 +1099,7 @@ export async function getOS(id: string) {
   } as OSRow;
 }
 
-/** Cria OS e faz patch de campos opcionais se existirem */
+/** Cria OS e normaliza campos para passar nos CHECKs */
 export async function createOS(payload: {
   titulo: string;
   descricao?: string | null;
@@ -1068,6 +1113,10 @@ export async function createOS(payload: {
   fornecedor_contato?: string | null;
   origem?: string | null;
 }) {
+  const prioridadeNorm = normalizeOsPrioridade(payload.prioridade) ?? null;
+  const tipoNorm = normalizeTipoManutencao(payload.tipo_manutencao) ?? null;
+  const dataPrev = toISODateOnly(payload.data_prevista);
+
   const safeInsert: any = {
     titulo: payload.titulo,
     descricao: payload.descricao ?? null,
@@ -1075,6 +1124,9 @@ export async function createOS(payload: {
     ativo_id: payload.ativo_id ?? null,
     condominio_id: payload.condominio_id ?? null,
     status: osDbEncodeStatus("aberta"),
+    prioridade: prioridadeNorm,         // passa no CHECK prioridade se existir
+    tipo_manutencao: tipoNorm,          // passa no CHECK tipo_manutencao se existir
+    data_prevista: dataPrev,            // 'YYYY-MM-DD'
   };
 
   const { data, error } = await supabase
@@ -1087,9 +1139,6 @@ export async function createOS(payload: {
 
   const patch: any = {};
   if (payload.origem != null) patch.origem = payload.origem;
-  if (payload.prioridade != null) patch.prioridade = payload.prioridade;
-  if (payload.tipo_manutencao != null) patch.tipo_manutencao = payload.tipo_manutencao;
-  if (payload.data_prevista != null) patch.data_prevista = payload.data_prevista;
   if (payload.fornecedor_nome != null) patch.fornecedor_nome = payload.fornecedor_nome;
   if (payload.fornecedor_contato != null) patch.fornecedor_contato = payload.fornecedor_contato;
 
@@ -1112,7 +1161,7 @@ export async function createOS(payload: {
 export async function updateOS(
   id: string,
   patch: Partial<
-    Pick<OSRow, "titulo" | "descricao" | "responsavel" | "status" | "ativo_id">
+    Pick<OSRow, "titulo" | "descricao" | "responsavel" | "status" | "ativo_id" | "prioridade" | "tipo_manutencao" | "data_prevista">
   >
 ) {
   const upd: any = {};
@@ -1122,7 +1171,18 @@ export async function updateOS(
   if (typeof patch.responsavel !== "undefined")
     upd.responsavel = patch.responsavel ?? null;
   if (typeof patch.ativo_id !== "undefined") upd.ativo_id = patch.ativo_id ?? null;
-  if (typeof patch.status !== "undefined") upd.status = osDbEncodeStatus(patch.status);
+
+  if (typeof patch.status !== "undefined")
+    upd.status = osDbEncodeStatus(patch.status as OSStatus);
+
+  if (typeof patch.prioridade !== "undefined")
+    upd.prioridade = normalizeOsPrioridade(patch.prioridade) ?? null;
+
+  if (typeof patch.tipo_manutencao !== "undefined")
+    upd.tipo_manutencao = normalizeTipoManutencao(patch.tipo_manutencao) ?? null;
+
+  if (typeof patch.data_prevista !== "undefined")
+    upd.data_prevista = toISODateOnly(patch.data_prevista);
 
   upd.updated_at = new Date().toISOString();
 
@@ -1130,11 +1190,11 @@ export async function updateOS(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
 
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return {
     ...r,
     status: osNormalizeStatus(r.status),
@@ -1161,11 +1221,11 @@ export async function assignOSExecutor(
     .from("os")
     .update(upd)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
 
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1178,11 +1238,11 @@ export async function setOSStatus(id: string, status: OSStatus) {
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
 
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1203,11 +1263,11 @@ export async function validateOS(
     .from("os")
     .update(patch)
     .eq("id", id)
-    .select()
-    .single();
+    .select("*")
+    .limit(1);
 
   if (error) throw error;
-  const r: any = data;
+  const r: any = (data ?? [])[0];
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1296,6 +1356,7 @@ export async function getCondoConfig(): Promise<CondoConfig | null> {
     .from("condominio_config")
     .select("*")
     .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (error && status !== 406) throw error;
   return data ?? null;
@@ -1522,13 +1583,11 @@ export async function isConformidadeForTipo(
 
 export async function listLocais(): Promise<LocalRow[]> {
   const { data, error } = await supabase
-;  // deliberate line break to ensure correct paste
-  const res = await supabase
     .from("locais")
     .select("*")
     .order("nome", { ascending: true });
-  if (res.error) throw res.error;
-  return res.data ?? [];
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function createLocal(nome: string) {
