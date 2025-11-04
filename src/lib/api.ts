@@ -1231,7 +1231,7 @@ export async function assignOSExecutor(
     .update(upd)
     .eq("id", id)
     .select("*")
-    .limit(1);
+    .single();
 
   if (error) throw error;
   const r: any = (data ?? [])[0];
