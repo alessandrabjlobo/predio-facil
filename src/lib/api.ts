@@ -1108,6 +1108,18 @@ export async function getOS(id: string) {
   } as OSRow;
 }
 
+export async function gerarPlanosPreventivos(condominioId: string): Promise<boolean> {
+  const { error } = await supabase.rpc("criar_planos_preventivos", {
+    p_condominio_id: condominioId,
+  });
+
+  if (error) {
+    // Propaga o erro para o caller (componente mostrar toast, etc.)
+    throw error;
+  }
+  return true;
+}
+
 /** Cria OS (NBR 5674) e normaliza campos para passar nos CHECKs */
 export async function createOS(payload: {
   // básicos
