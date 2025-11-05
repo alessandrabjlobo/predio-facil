@@ -102,7 +102,6 @@ function normalizeTipoManutencao(t?: string | null): "preventiva"|"corretiva"|"p
   return null;
 }
 
-/** status: UI usa "em andamento"; DB tem CHECK específico (com espaço) */
 /** status mostrado na UI */
 export type OSStatus =
   | "aberta"
@@ -130,12 +129,10 @@ function osDbEncodeStatus(s: OSStatus | string): string {
   return k;
 }
 
-
 /** força 'YYYY-MM-DD' */
 function toISODateOnly(d?: string | null) {
   if (!d) return null;
   try {
-    // aceita 'YYYY-MM-DD' direto
     if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
     const dt = new Date(d);
     if (isNaN(dt.getTime())) return null;
@@ -356,7 +353,7 @@ export async function listAtivos() {
       .select(
         `
         *,
-        ativo_tipos!ativos_tipo_id_fkey(nome, slug)
+        ativo_tipos:ativo_tipos!ativos_tipo_id_fkey ( id, nome, slug )
       `
       )
       .order("created_at", { ascending: false });
@@ -382,66 +379,56 @@ export async function listAtivos() {
 
 export async function createAtivo(payload: {
   nome: string;
-  tipo: string;
+  tipo_id?: string;          // ✅ usar id do tipo
+  tipo?: string;             // (opcional) ainda aceita nome e resolve para id
   local?: string;
+  condominio_id?: string;    // importante para multi-tenant
 }) {
+  let tipo_id = payload.tipo_id;
+
+  // Se veio "tipo" (nome), resolvemos para id:
+  if (!tipo_id && payload.tipo) {
+    const meta = await getAtivoTipoMeta(payload.tipo);
+    if (meta) tipo_id = meta.id;
+  }
+
+  const insert: any = {
+    nome: payload.nome,
+    local: payload.local ?? null,
+    condominio_id: payload.condominio_id ?? null,
+    ...(tipo_id ? { tipo_id } : {}),   // ✅ só envia se tiver
+  };
+
   const { data: ativo, error } = await supabase
     .from("ativos")
-    .insert(payload)
+    .insert(insert)
     .select()
     .single();
   if (error) throw error;
 
-  try {
-    const templates = await listTemplatesBySistema(payload.tipo);
-    if (templates.length > 0) {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const rows = templates.map((t: any) => ({
-        ativo_id: ativo.id,
-        titulo: t.titulo_plano,
-        tipo: "preventiva",
-        periodicidade: t.periodicidade as any,
-        proxima_execucao: hoje,
-        checklist: t.checklist ?? [],
-        responsavel: t.responsavel ?? "sindico",
-      }));
-      for (const r of rows) {
-        const { data: ja } = await supabase
-          .from("planos_manutencao")
-          .select("id")
-          .eq("ativo_id", r.ativo_id)
-          .eq("titulo", r.titulo)
-          .maybeSingle();
-        if (!ja) {
-          const { error: eIns } = await supabase
-            .from("planos_manutencao")
-            .insert(r as any);
-          if (eIns) console.warn("Falha ao criar plano padrão:", eIns.message);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("Templates não aplicados:", (e as any)?.message);
-  }
-
-  // garante um plano preventivo default conforme o tipo (se tiver periodicidade_default)
-  try {
-    await ensureDefaultPlanoParaAtivo({ id: ativo.id, tipo: payload.tipo });
-  } catch (e) {
-    console.warn("Plano default não criado:", (e as any)?.message);
-  }
-
+  // (Opcional) Remova a criação de planos no front: o TRIGGER já faz isso no DB.
   return ativo;
 }
 
 export async function updateAtivo(
   id: string,
-  patch: Partial<{ nome: string; tipo: string; local: string | null }>
+  patch: Partial<{ nome: string; tipo_id: string | null; tipo: string | null; local: string | null }>
 ) {
   const update: any = {};
   if (typeof patch.nome !== "undefined") update.nome = patch.nome ?? null;
-  if (typeof patch.tipo !== "undefined") update.tipo = patch.tipo ?? null;
   if (typeof patch.local !== "undefined") update.local = patch.local ?? null;
+
+  // Preferir tipo_id; se vier "tipo" (nome), resolver para id
+  if (typeof patch.tipo_id !== "undefined") {
+    update.tipo_id = patch.tipo_id; // aceita null
+  } else if (typeof patch.tipo !== "undefined") {
+    if (patch.tipo) {
+      const meta = await getAtivoTipoMeta(patch.tipo);
+      update.tipo_id = meta?.id ?? null;
+    } else {
+      update.tipo_id = null;
+    }
+  }
 
   const { data, error } = await supabase
     .from("ativos")
@@ -1114,7 +1101,6 @@ export async function gerarPlanosPreventivos(condominioId: string): Promise<bool
   });
 
   if (error) {
-    // Propaga o erro para o caller (componente mostrar toast, etc.)
     throw error;
   }
   return true;
@@ -1177,7 +1163,6 @@ export async function createOS(payload: {
   const tipoNorm = normalizeTipoManutencao(payload.tipo_manutencao) ?? null;
   const dataPrev = toISODateOnly(payload.data_prevista);
 
-  // INSERT mínimo (garante passar nos CHECKs/NOT NULL)
   const safeInsert: any = {
     titulo: payload.titulo,
     descricao: payload.descricao ?? null,
@@ -1185,9 +1170,9 @@ export async function createOS(payload: {
     ativo_id: payload.ativo_id ?? null,
     condominio_id: payload.condominio_id ?? null,
     status: osDbEncodeStatus("aberta"),
-    prioridade: prioridadeNorm,          // passa no CHECK prioridade
-    tipo_manutencao: tipoNorm,           // passa no CHECK tipo_manutencao
-    data_prevista: dataPrev,             // 'YYYY-MM-DD' ou null
+    prioridade: prioridadeNorm,
+    tipo_manutencao: tipoNorm,
+    data_prevista: dataPrev,
   };
 
   const { data, error } = await supabase
@@ -1198,7 +1183,6 @@ export async function createOS(payload: {
 
   if (error) throw error;
 
-  // UPDATE opcional com campos normativos (só aplica se existirem as colunas)
   const extraPatch: any = {};
 
   // identificação / origem
@@ -1246,7 +1230,6 @@ export async function createOS(payload: {
     try {
       await supabase.from("os").update(extraPatch).eq("id", (data as any).id);
     } catch (e) {
-      // Se alguma coluna ainda não existe, apenas registra e segue
       console.warn("Campos extras (opcionais) não aplicados:", (e as any)?.message);
     }
   }
@@ -1258,7 +1241,6 @@ export async function createOS(payload: {
     data_abertura: r.data_abertura ?? r.created_at ?? null,
   } as OSRow;
 }
-
 
 export async function updateOS(
   id: string,
@@ -1418,7 +1400,7 @@ export async function assignOSExecutor(
     .single();
 
   if (error) throw error;
-  const r: any = (data ?? [])[0];
+  const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
 
@@ -1432,13 +1414,12 @@ export async function setOSStatus(id: string, status: OSStatus) {
     .update(patch)
     .eq("id", id)
     .select("*")
-    .single(); // << evita 400
+    .single();
 
   if (error) throw error;
   const r: any = data;
   return { ...r, status: osNormalizeStatus(r.status) } as OSRow;
 }
-
 
 /** Validação: aprovado -> concluída; reprovado -> em andamento (guarda observações se existir) */
 export async function validateOS(
