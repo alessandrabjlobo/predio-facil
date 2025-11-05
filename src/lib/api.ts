@@ -392,10 +392,16 @@ export async function createAtivo(payload: {
     if (meta) tipo_id = meta.id;
   }
 
+  // Ensure condominio_id is always provided
+  const condoId = payload.condominio_id || localStorage.getItem("currentCondominioId");
+  if (!condoId) {
+    throw new Error("Condomínio não selecionado. Por favor, selecione um condomínio antes de criar um ativo.");
+  }
+
   const insert: any = {
     nome: payload.nome,
     local: payload.local ?? null,
-    condominio_id: payload.condominio_id ?? null,
+    condominio_id: condoId,
     ...(tipo_id ? { tipo_id } : {}),   // ✅ só envia se tiver
   };
 
@@ -406,7 +412,7 @@ export async function createAtivo(payload: {
     .single();
   if (error) throw error;
 
-  // (Opcional) Remova a criação de planos no front: o TRIGGER já faz isso no DB.
+  // Trigger will auto-create preventive plan
   return ativo;
 }
 

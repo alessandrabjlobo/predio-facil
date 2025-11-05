@@ -40,7 +40,7 @@ type Props = {
 };
 
 export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }: Props) {
-  const { condominioId } = useCondominioAtual();
+  const { condominio } = useCondominioAtual();
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -81,7 +81,7 @@ export default function OsForm({ mode, initial, onCreated, onUpdated, onCancel }
         titulo: raw.titulo,
         descricao: raw.descricao ?? null,
         ativo_id: raw.ativo_id ?? null,
-        condominio_id: condominioId ?? null,
+        condominio_id: condominio?.id ?? null,
         tipo_manutencao: norm.tipo_manutencao,
         prioridade: norm.prioridade,
         data_prevista: norm.data_prevista, // null se vazio

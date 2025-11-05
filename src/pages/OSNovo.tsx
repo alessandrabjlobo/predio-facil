@@ -143,7 +143,8 @@ export default function OSNovo() {
             .eq("id", pre.ativo_id)
             .maybeSingle();
 
-          const slug = ativo?.ativo_tipos?.slug;
+          const ativoTipos = ativo?.ativo_tipos as { slug?: string } | { slug?: string }[] | null;
+          const slug = Array.isArray(ativoTipos) ? ativoTipos[0]?.slug : ativoTipos?.slug;
           if (slug) {
             const { data: req } = await supabase
               .from("nbr_requisitos")
