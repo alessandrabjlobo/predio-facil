@@ -1,3 +1,4 @@
+// src/components/maintenance/PreventivePlansTab.tsx
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -9,19 +10,26 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Clock, User, FileCheck, Plus, Search } from "lucide-react";
+import { Calendar, Clock, User, FileCheck, Plus, Search, RefreshCw } from "lucide-react";
 import { usePlanosManutencao } from "@/hooks/usePlanosManutencao";
 import { format, differenceInDays, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PlansTableView } from "@/components/maintenance/PlansTableView";
 import { ViewToggle } from "@/components/patterns/ViewToggle";
 import { useNavigate } from "react-router-dom";
+import { useCondominioAtual } from "@/hooks/useCondominioAtual";
+import { gerarPlanosPreventivos } from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 export function PreventivePlansTab() {
-  const { planos, isLoading } = usePlanosManutencao();
+  const { planos, isLoading, refetch } = usePlanosManutencao() as any;
   const navigate = useNavigate();
+  const { condominio } = useCondominioAtual();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [genLoading, setGenLoading] = useState(false);
+  const [autoRan, setAutoRan] = useState(false);
+
   const [viewMode, setViewMode] = useState<"list" | "card">(() => {
     const saved = localStorage.getItem("maintenance_plans_view");
     return (saved as "list" | "card") || "card";
@@ -31,18 +39,40 @@ export function PreventivePlansTab() {
     localStorage.setItem("maintenance_plans_view", viewMode);
   }, [viewMode]);
 
+  // Geração automática (uma vez) se não houver planos e existir condomínio atual
+  useEffect(() => {
+    const shouldAutoGenerate =
+      !isLoading && !autoRan && (planos?.length ?? 0) === 0 && condominio?.id;
+    if (!shouldAutoGenerate) return;
+
+    setAutoRan(true);
+    (async () => {
+      try {
+        setGenLoading(true);
+        await gerarPlanosPreventivos(condominio!.id);
+        toast({ title: "Planos gerados automaticamente." });
+        if (typeof refetch === "function") await refetch();
+      } catch (e: any) {
+        // Silencioso para não incomodar; usuário pode usar o botão manual
+        console.error("Auto-generate preventive plans failed:", e?.message || e);
+      } finally {
+        setGenLoading(false);
+      }
+    })();
+  }, [isLoading, autoRan, planos, condominio, refetch]);
+
   const getPeriodicidadeLabel = (periodicidade: any) => {
     if (!periodicidade) return "N/A";
     const match = periodicidade.toString().match(/(\d+)/);
     if (match) {
-      const days = parseInt(match[1]);
+      const days = parseInt(match[1], 10);
       if (days === 30) return "Mensal";
       if (days === 90) return "Trimestral";
       if (days === 180) return "Semestral";
       if (days === 365) return "Anual";
       return `${days} dias`;
     }
-    return periodicidade;
+    return String(periodicidade);
   };
 
   const getStatusColor = (proximaExecucao: string) => {
@@ -77,7 +107,7 @@ export function PreventivePlansTab() {
   };
 
   const filteredPlanos =
-    planos?.filter((plano) => {
+    planos?.filter((plano: any) => {
       const search = searchTerm.toLowerCase();
       return (
         plano.titulo?.toLowerCase().includes(search) ||
@@ -85,14 +115,6 @@ export function PreventivePlansTab() {
         plano.ativos?.nome?.toLowerCase().includes(search)
       );
     }) ?? [];
-
-  if (isLoading) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        Carregando planos...
-      </div>
-    );
-  }
 
   /** Abre o formulário COMPLETO em /os/novo com os campos pré-preenchidos */
   const handleGenerateOS = (plano: any) => {
@@ -116,6 +138,39 @@ export function PreventivePlansTab() {
     navigate(`/os/novo?${qs.toString()}`);
   };
 
+  const handleGeneratePlans = async () => {
+    if (!condominio?.id) {
+      toast({ variant: "destructive", title: "Condomínio não definido", description: "Selecione um condomínio para gerar os planos." });
+      return;
+    }
+    try {
+      setGenLoading(true);
+      await gerarPlanosPreventivos(condominio.id);
+      toast({ title: "Planos preventivos gerados com sucesso." });
+      if (typeof refetch === "function") {
+        await refetch();
+      } else {
+        toast({ description: "Atualize a página para ver os novos planos." });
+      }
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Falha ao gerar planos",
+        description: e?.message ?? "Erro inesperado",
+      });
+    } finally {
+      setGenLoading(false);
+    }
+  };
+
+  if (isLoading && !planos) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Carregando planos...
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
@@ -129,6 +184,10 @@ export function PreventivePlansTab() {
           />
         </div>
         <ViewToggle view={viewMode} onViewChange={setViewMode} />
+        <Button variant="outline" onClick={handleGeneratePlans} disabled={genLoading}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          {genLoading ? "Gerando..." : "Gerar planos"}
+        </Button>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
           Novo Plano
@@ -143,13 +202,19 @@ export function PreventivePlansTab() {
               Nenhum plano preventivo cadastrado.
               <br />
               Os planos são criados automaticamente ao cadastrar ativos que
-              requerem conformidade.
+              requerem conformidade ou pelo botão “Gerar planos”.
             </p>
+            <div className="mt-4">
+              <Button variant="outline" onClick={handleGeneratePlans} disabled={genLoading}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                {genLoading ? "Gerando..." : "Gerar planos agora"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : viewMode === "card" ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPlanos.map((plano) => {
+          {filteredPlanos.map((plano: any) => {
             const d = plano.proxima_execucao ? new Date(plano.proxima_execucao) : null;
             const dataFmt =
               d && isValid(d)
