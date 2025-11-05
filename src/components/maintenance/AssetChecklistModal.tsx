@@ -22,6 +22,34 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
     }
   }, [open, ativo?.id]);
 
+  const loadAssetInfoFallback = async () => {
+    try {
+      const { data: planos } = await supabase
+        .from("planos_manutencao")
+        .select("checklist, titulo")
+        .eq("ativo_id", ativo.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (planos?.checklist) {
+        setChecklistItems(Array.isArray(planos.checklist) ? planos.checklist : []);
+      }
+
+      const { data: manutencoes } = await supabase
+        .from("manutencoes")
+        .select("id, vencimento, status")
+        .eq("ativo_id", ativo.id)
+        .order("vencimento", { ascending: false })
+        .limit(10);
+
+      if (manutencoes) {
+        setMaintenanceHistory(manutencoes);
+      }
+    } catch (e) {
+      console.warn("Fallback also failed:", e);
+    }
+  };
+
   const loadAssetInfo = async () => {
     setLoading(true);
     try {
@@ -29,7 +57,14 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
         p_ativo_id: ativo.id,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('does not exist')) {
+          console.warn("get_asset_maintenance_info RPC not available, using fallback");
+          await loadAssetInfoFallback();
+          return;
+        }
+        throw error;
+      }
 
       if (data && data.length > 0) {
         const result = data[0];
@@ -38,6 +73,7 @@ export function AssetChecklistModal({ open, onOpenChange, ativo }: AssetChecklis
       }
     } catch (error) {
       console.error("Error loading asset info:", error);
+      await loadAssetInfoFallback();
     } finally {
       setLoading(false);
     }

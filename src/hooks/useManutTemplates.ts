@@ -37,9 +37,15 @@ export const useManutTemplates = () => {
       const { data, error } = await supabase
         .from("documento_tipos")
         .select("*")
-        .order("nome", { ascending: true });
+        .order("nome", { ascending: true});
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === 'PGRST204' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+          console.warn("documento_tipos table not available, returning empty array");
+          return [];
+        }
+        throw error;
+      }
       return data || [];
     },
   });
@@ -53,7 +59,13 @@ export const useManutTemplates = () => {
           .select("*, documento_tipos(*)")
           .eq("template_id", templateId);
 
-        if (error) throw error;
+        if (error) {
+          if (error.code === 'PGRST204' || error.message?.includes('relation') || error.message?.includes('does not exist')) {
+            console.warn("documento_tipos or manut_template_documentos not available, returning empty array");
+            return [];
+          }
+          throw error;
+        }
         return data || [];
       },
       enabled: !!templateId,
