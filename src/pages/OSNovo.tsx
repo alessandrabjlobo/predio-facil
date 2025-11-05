@@ -11,6 +11,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { CalendarIcon, ClipboardList } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client"; // para buscar checklist da NBR, se necessário
+
+type RiscoNivel = "baixo" | "medio" | "alto";
+
+const KEYWORDS_PT = ["elétric", "eletric", "solda", "quente", "espaço confinado", "espaco confinado"];
+const EPIS_SUGERIDOS: Record<string, string[]> = {
+  preventiva: ["Capacete", "Óculos de proteção"],
+  preditiva: ["Capacete", "Luvas de segurança"],
+  corretiva: ["Capacete", "Óculos de proteção", "Luvas de segurança"],
+};
+
+function sugereNivelRisco(tipo: string, prioridade: string): RiscoNivel {
+  if (prioridade === "urgente") return "alto";
+  if (tipo === "corretiva" && (prioridade === "alta" || prioridade === "urgente")) return "alto";
+  if (tipo === "preditiva") return "medio";
+  return "medio";
+}
+function precisaPT(nivel: RiscoNivel, texto: string) {
+  if (nivel === "alto") return true;
+  const t = (texto || "").toLowerCase();
+  return KEYWORDS_PT.some(k => t.includes(k));
+}
 
 export default function OSNovo() {
   const navigate = useNavigate();
@@ -26,7 +48,7 @@ export default function OSNovo() {
       condominio_id: params.get("condo") || params.get("condominio") || "",
       plano_id: params.get("plan") || "",
       descricao: params.get("description") || "",
-      prioridade: params.get("priority") || "media",
+      prioridade: (params.get("priority") || "media") as "baixa" | "media" | "alta" | "urgente",
     };
   }, [params]);
 
@@ -37,16 +59,13 @@ export default function OSNovo() {
     titulo: pre.titulo,
     descricao: pre.descricao,
     tipo_manutencao: (pre.origem === "plan" ? "preventiva" : "corretiva") as "preventiva" | "corretiva" | "preditiva",
-    prioridade: (pre.prioridade || "media") as "baixa" | "media" | "alta" | "urgente",
+    prioridade: pre.prioridade,
     data_prevista: pre.vencimento,
 
-    // Identificação / origem
+    // Identificação / origem (travados no UI)
     ativo_id: pre.ativo_id || "",
     condominio_id: pre.condominio_id || "",
     plano_id: pre.plano_id || "",
-    solicitante_nome: "",
-    solicitante_contato: "",
-    aprovador_nome: "",
     origem: pre.origem,
 
     // Escopo / checklist / recursos
@@ -56,7 +75,7 @@ export default function OSNovo() {
     equipeText: "",
 
     // Segurança / PT
-    risco_nivel: "medio" as "baixo" | "medio" | "alto",
+    risco_nivel: "medio" as RiscoNivel,
     riscos_identificados: "",
     epi_text: "",
     pt_numero: "",
@@ -71,16 +90,12 @@ export default function OSNovo() {
     custo_materiais: "",
     custo_total: "",
 
-    // Fornecedor
+    // Execução
     fornecedor_nome: "",
     fornecedor_contato: "",
-
-    // Aceite / validação
-    aceite_responsavel: "",
-    aceite_data: "",
-    validacao_obs: "",
   });
 
+  // Em qualquer mudança de pre, garante consistência
   useEffect(() => {
     setForm((s) => ({
       ...s,
@@ -91,10 +106,81 @@ export default function OSNovo() {
       plano_id: pre.plano_id || s.plano_id,
       origem: pre.origem || s.origem,
       data_prevista: pre.vencimento || s.data_prevista,
-      prioridade: (pre.prioridade || s.prioridade) as "baixa" | "media" | "alta" | "urgente",
-      tipo_manutencao: (pre.origem === "plan" ? "preventiva" : s.tipo_manutencao) as "preventiva" | "corretiva" | "preditiva",
+      prioridade: pre.prioridade,
+      tipo_manutencao: (pre.origem === "plan" ? "preventiva" : s.tipo_manutencao),
     }));
   }, [pre]);
+
+  // Prefill por plano: checklist do plano ou checklist da NBR do tipo do ativo
+  useEffect(() => {
+    (async () => {
+      if (pre.plano_id) {
+        // tenta carregar checklist do plano
+        const { data: plano } = await supabase
+          .from("planos_preventivos")
+          .select("checklist, titulo, descricao, prioridade, responsavel, proxima_execucao")
+          .eq("id", pre.plano_id)
+          .maybeSingle();
+
+        if (plano) {
+          setForm((s) => ({
+            ...s,
+            tipo_manutencao: "preventiva",
+            prioridade: (plano.prioridade as any) || s.prioridade,
+            data_prevista: plano.proxima_execucao?.slice(0, 10) || s.data_prevista,
+            titulo: s.titulo || (plano.titulo ? `Manutenção — ${plano.titulo}` : s.titulo),
+            descricao: s.descricao || plano.descricao || s.descricao,
+            escopo: `Execução preventiva conforme plano e NBR 5674.`,
+            checklistText: Array.isArray(plano.checklist) ? plano.checklist.join("\n") : s.checklistText,
+          }));
+        }
+
+        // fallback NBR se não houver checklist no plano
+        if (!form.checklistText && pre.ativo_id) {
+          const { data: ativo } = await supabase
+            .from("ativos")
+            .select("ativo_tipos(slug)")
+            .eq("id", pre.ativo_id)
+            .maybeSingle();
+
+          const slug = ativo?.ativo_tipos?.slug;
+          if (slug) {
+            const { data: req } = await supabase
+              .from("nbr_requisitos")
+              .select("checklist_items")
+              .eq("ativo_tipo_slug", slug)
+              .limit(1)
+              .maybeSingle();
+
+            const linhas: string[] =
+              (req?.checklist_items as string[] | null | undefined)?.filter(Boolean) ?? [];
+
+            if (linhas.length) {
+              setForm((s) => ({ ...s, checklistText: linhas.join("\n") }));
+            }
+          }
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pre.plano_id, pre.ativo_id]);
+
+  // Sugestões automáticas (EPIs, risco, exibição do bloco de PT)
+  const [mostrarPT, setMostrarPT] = useState(false);
+  useEffect(() => {
+    const nivel = sugereNivelRisco(form.tipo_manutencao, form.prioridade);
+    const episBase = EPIS_SUGERIDOS[form.tipo_manutencao] ?? EPIS_SUGERIDOS["corretiva"];
+
+    setForm((s) => ({
+      ...s,
+      risco_nivel: nivel,
+      epi_text: s.epi_text?.trim() ? s.epi_text : episBase.join("\n"),
+    }));
+
+    const texto = `${form.escopo}\n${form.checklistText}`;
+    setMostrarPT(precisaPT(nivel, texto));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.tipo_manutencao, form.prioridade, form.escopo, form.checklistText]);
 
   function parseArrayOfObjects(text: string, mode: "checklist" | "materiais" | "equipe" | "epi") {
     if (!text.trim()) return null;
@@ -107,13 +193,12 @@ export default function OSNovo() {
         .map((l) => l.trim())
         .filter(Boolean);
 
-      if (lines.length === 0) return null;
+      if (!lines.length) return null;
 
-      if (mode === "epi") return lines; // array de strings
+      if (mode === "epi") return lines; // strings
       if (mode === "checklist") return lines.map((item) => ({ item, obrigatorio: true }));
       if (mode === "materiais") return lines.map((l) => ({ descricao: l, qtd: 1 }));
       if (mode === "equipe") return lines.map((l) => ({ funcao: l }));
-
       return null;
     }
   }
@@ -124,6 +209,11 @@ export default function OSNovo() {
       toast({ title: "Informe o título da OS.", variant: "destructive" });
       return;
     }
+    if (!form.ativo_id || !form.condominio_id) {
+      toast({ title: "Dados obrigatórios", description: "Ativo e condomínio são obrigatórios.", variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       const checklist = parseArrayOfObjects(form.checklistText, "checklist");
@@ -131,52 +221,47 @@ export default function OSNovo() {
       const equipe = parseArrayOfObjects(form.equipeText, "equipe");
       const epi_lista = parseArrayOfObjects(form.epi_text, "epi");
 
+      // Campos de aceite NÃO fazem parte do formulário — serão definidos automaticamente
+      // (ex.: quando a OS for concluída, setar síndico autenticado como responsável pelo aceite)
+
       const novo = await createOS({
-        // Campos já existentes no seu backend
         titulo: form.titulo,
         descricao: form.descricao || null,
-        responsavel: null,
-        ativo_id: form.ativo_id || null,
-        condominio_id: form.condominio_id || null,
+        ativo_id: form.ativo_id,
+        condominio_id: form.condominio_id,
         tipo_manutencao: form.tipo_manutencao,
         prioridade: form.prioridade,
         data_prevista: form.data_prevista || null,
         origem: form.origem || "manual",
+        plano_id: form.plano_id || null,
 
-        // Fornecedor
+        // Execução
         fornecedor_nome: form.fornecedor_nome || null,
         fornecedor_contato: form.fornecedor_contato || null,
 
-        // Campos normativos extras (createOS já trata como opcionais)
-        solicitante_nome: form.solicitante_nome || null as any,
-        solicitante_contato: form.solicitante_contato || null as any,
-        aprovador_nome: form.aprovador_nome || null as any,
-
-        escopo: form.escopo || null as any,
+        // Normativos
+        escopo: form.escopo || null,
         checklist: (checklist as any) ?? null,
         materiais: (materiais as any) ?? null,
         equipe: (equipe as any) ?? null,
 
         risco_nivel: form.risco_nivel,
-        riscos_identificados: form.riscos_identificados || null as any,
+        riscos_identificados: form.riscos_identificados || null,
         epi_lista: (epi_lista as any) ?? null,
-        pt_numero: form.pt_numero || null as any,
-        pt_tipo: form.pt_tipo || null as any,
+        pt_numero: mostrarPT ? form.pt_numero || null : null,
+        pt_tipo: mostrarPT ? form.pt_tipo || null : null,
 
-        sla_inicio: form.sla_inicio || null as any,
-        sla_fim: form.sla_fim || null as any,
+        // SLA
+        sla_inicio: form.sla_inicio || null,
+        sla_fim: form.sla_fim || null,
 
+        // Custos
         custo_estimado: form.custo_estimado ? Number(form.custo_estimado) : null,
         custo_materiais: form.custo_materiais ? Number(form.custo_materiais) : null,
         custo_total: form.custo_total ? Number(form.custo_total) : null,
-
-        aceite_responsavel: form.aceite_responsavel || null as any,
-        aceite_data: form.aceite_data || null as any,
-        validacao_obs: form.validacao_obs || null as any,
       } as any);
 
       toast({ title: "OS criada com sucesso!" });
-
       if (novo?.ativo_id) navigate(`/os?ativo=${novo.ativo_id}`);
       else navigate(`/os`);
     } catch (e: any) {
@@ -206,6 +291,27 @@ export default function OSNovo() {
 
         <CardContent>
           <form onSubmit={onSubmit} className="grid gap-6">
+            {/* Cabeçalho travado */}
+            <section className="grid md:grid-cols-3 gap-4">
+              <div>
+                <Label>Ativo (ID)</Label>
+                <Input value={form.ativo_id} disabled />
+                <input type="hidden" name="ativo_id" value={form.ativo_id} />
+              </div>
+              <div>
+                <Label>Condomínio (ID)</Label>
+                <Input value={form.condominio_id} disabled />
+                <input type="hidden" name="condominio_id" value={form.condominio_id} />
+              </div>
+              <div>
+                <Label>Origem</Label>
+                <Input value={form.origem} disabled />
+                <input type="hidden" name="origem" value={form.origem} />
+              </div>
+            </section>
+
+            <Separator />
+
             {/* Básico */}
             <section className="grid md:grid-cols-2 gap-4">
               <div>
@@ -237,6 +343,7 @@ export default function OSNovo() {
                     <SelectItem value="preditiva">Preditiva</SelectItem>
                   </SelectContent>
                 </Select>
+                {form.plano_id && <p className="text-xs text-muted-foreground mt-1">Definido pelo plano</p>}
               </div>
 
               <div>
@@ -263,57 +370,6 @@ export default function OSNovo() {
 
             <Separator />
 
-            {/* Identificação / origem */}
-            <section className="grid md:grid-cols-3 gap-4">
-              <div>
-                <Label>Ativo (ID)</Label>
-                <Input
-                  value={form.ativo_id}
-                  onChange={(e) => setForm({ ...form, ativo_id: e.target.value })}
-                  placeholder="Opcional"
-                />
-              </div>
-              <div>
-                <Label>Condomínio (ID)</Label>
-                <Input
-                  value={form.condominio_id}
-                  onChange={(e) => setForm({ ...form, condominio_id: e.target.value })}
-                  placeholder="Opcional"
-                />
-              </div>
-              <div>
-                <Label>Origem</Label>
-                <Input
-                  value={form.origem}
-                  onChange={(e) => setForm({ ...form, origem: e.target.value })}
-                  placeholder="manual / plano / inspeção..."
-                />
-              </div>
-              <div>
-                <Label>Solicitante</Label>
-                <Input
-                  value={form.solicitante_nome}
-                  onChange={(e) => setForm({ ...form, solicitante_nome: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Contato do solicitante</Label>
-                <Input
-                  value={form.solicitante_contato}
-                  onChange={(e) => setForm({ ...form, solicitante_contato: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Aprovador</Label>
-                <Input
-                  value={form.aprovador_nome}
-                  onChange={(e) => setForm({ ...form, aprovador_nome: e.target.value })}
-                />
-              </div>
-            </section>
-
-            <Separator />
-
             {/* Escopo / checklist / recursos */}
             <section className="grid md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
@@ -328,6 +384,7 @@ export default function OSNovo() {
                   value={form.checklistText}
                   onChange={(e) => setForm({ ...form, checklistText: e.target.value })}
                 />
+                {form.plano_id && <p className="text-xs text-muted-foreground mt-1">Carregado do plano / NBR</p>}
               </div>
               <div>
                 <Label>Materiais (uma linha por item ou JSON)</Label>
@@ -351,10 +408,10 @@ export default function OSNovo() {
 
             <Separator />
 
-            {/* Segurança */}
+            {/* Segurança — PT condicional e EPIs sugeridos */}
             <section className="grid md:grid-cols-3 gap-4">
               <div>
-                <Label>Nível de risco</Label>
+                <Label>Nível de risco (sugerido)</Label>
                 <Select
                   value={form.risco_nivel}
                   onValueChange={(v: any) => setForm({ ...form, risco_nivel: v })}
@@ -366,6 +423,9 @@ export default function OSNovo() {
                     <SelectItem value="alto">Alto</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Sugestão automática pelo tipo/prioridade – editável.
+                </p>
               </div>
               <div className="md:col-span-2">
                 <Label>Riscos identificados</Label>
@@ -383,15 +443,21 @@ export default function OSNovo() {
                   value={form.epi_text}
                   onChange={(e) => setForm({ ...form, epi_text: e.target.value })}
                 />
+                <p className="text-xs text-muted-foreground mt-1">EPIs sugeridos automaticamente; edite se precisar.</p>
               </div>
-              <div>
-                <Label>Nº PT</Label>
-                <Input value={form.pt_numero} onChange={(e) => setForm({ ...form, pt_numero: e.target.value })} />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Tipo de PT</Label>
-                <Input value={form.pt_tipo} onChange={(e) => setForm({ ...form, pt_tipo: e.target.value })} />
-              </div>
+
+              {mostrarPT && (
+                <>
+                  <div>
+                    <Label>Nº PT</Label>
+                    <Input value={form.pt_numero} onChange={(e) => setForm({ ...form, pt_numero: e.target.value })} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>Tipo de PT</Label>
+                    <Input value={form.pt_tipo} onChange={(e) => setForm({ ...form, pt_tipo: e.target.value })} />
+                  </div>
+                </>
+              )}
             </section>
 
             <Separator />
@@ -412,6 +478,28 @@ export default function OSNovo() {
                   type="date"
                   value={form.sla_fim}
                   onChange={(e) => setForm({ ...form, sla_fim: e.target.value })}
+                />
+              </div>
+            </section>
+
+            <Separator />
+
+            {/* Execução (simplificado para síndicos) */}
+            <section className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>{/* título mantido igual ao seu layout */}Fornecedor (empresa) / Funcionário</Label>
+                <Input
+                  value={form.fornecedor_nome}
+                  onChange={(e) => setForm({ ...form, fornecedor_nome: e.target.value })}
+                  placeholder="Ex.: Empresa XYZ ou João da Manutenção"
+                />
+              </div>
+              <div>
+                <Label>Contato</Label>
+                <Input
+                  value={form.fornecedor_contato}
+                  onChange={(e) => setForm({ ...form, fornecedor_contato: e.target.value })}
+                  placeholder="(85) 9xxxx-xxxx"
                 />
               </div>
             </section>
@@ -442,55 +530,6 @@ export default function OSNovo() {
                   inputMode="decimal"
                   value={form.custo_total}
                   onChange={(e) => setForm({ ...form, custo_total: e.target.value })}
-                />
-              </div>
-            </section>
-
-            <Separator />
-
-            {/* Fornecedor */}
-            <section className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label>Fornecedor (empresa)</Label>
-                <Input
-                  value={form.fornecedor_nome}
-                  onChange={(e) => setForm({ ...form, fornecedor_nome: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Contato do fornecedor</Label>
-                <Input
-                  value={form.fornecedor_contato}
-                  onChange={(e) => setForm({ ...form, fornecedor_contato: e.target.value })}
-                />
-              </div>
-            </section>
-
-            <Separator />
-
-            {/* Aceite / validação */}
-            <section className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <Label>Responsável pelo aceite</Label>
-                <Input
-                  value={form.aceite_responsavel}
-                  onChange={(e) => setForm({ ...form, aceite_responsavel: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Data do aceite</Label>
-                <Input
-                  type="date"
-                  value={form.aceite_data}
-                  onChange={(e) => setForm({ ...form, aceite_data: e.target.value })}
-                />
-              </div>
-              <div className="md:col-span-3">
-                <Label>Observações da validação</Label>
-                <Textarea
-                  rows={2}
-                  value={form.validacao_obs}
-                  onChange={(e) => setForm({ ...form, validacao_obs: e.target.value })}
                 />
               </div>
             </section>
