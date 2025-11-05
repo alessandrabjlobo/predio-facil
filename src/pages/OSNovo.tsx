@@ -16,14 +16,17 @@ export default function OSNovo() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
 
-  // Pré-preenchidos via querystring (?titulo=&ativo=&origem=&vencimento=&condominio=)
+  // Pré-preenchidos via querystring (?title=&asset=&origin=&due=&condo=&plan=&description=&priority=)
   const pre = useMemo(() => {
     return {
-      titulo: params.get("titulo") || "",
-      ativo_id: params.get("ativo") || "",
-      origem: params.get("origem") || "manual",
-      vencimento: params.get("vencimento") || "",
-      condominio_id: params.get("condominio") || "",
+      titulo: params.get("title") || params.get("titulo") || "",
+      ativo_id: params.get("asset") || params.get("ativo") || "",
+      origem: params.get("origin") || params.get("origem") || "manual",
+      vencimento: params.get("due") || params.get("vencimento") || "",
+      condominio_id: params.get("condo") || params.get("condominio") || "",
+      plano_id: params.get("plan") || "",
+      descricao: params.get("description") || "",
+      prioridade: params.get("priority") || "media",
     };
   }, [params]);
 
@@ -32,14 +35,15 @@ export default function OSNovo() {
   const [form, setForm] = useState({
     // Básico
     titulo: pre.titulo,
-    descricao: "",
-    tipo_manutencao: "preventiva" as "preventiva" | "corretiva" | "preditiva",
-    prioridade: "media" as "baixa" | "media" | "alta" | "urgente",
+    descricao: pre.descricao,
+    tipo_manutencao: (pre.origem === "plan" ? "preventiva" : "corretiva") as "preventiva" | "corretiva" | "preditiva",
+    prioridade: (pre.prioridade || "media") as "baixa" | "media" | "alta" | "urgente",
     data_prevista: pre.vencimento,
 
     // Identificação / origem
     ativo_id: pre.ativo_id || "",
     condominio_id: pre.condominio_id || "",
+    plano_id: pre.plano_id || "",
     solicitante_nome: "",
     solicitante_contato: "",
     aprovador_nome: "",
@@ -81,10 +85,14 @@ export default function OSNovo() {
     setForm((s) => ({
       ...s,
       titulo: pre.titulo || s.titulo,
+      descricao: pre.descricao || s.descricao,
       ativo_id: pre.ativo_id || s.ativo_id,
       condominio_id: pre.condominio_id || s.condominio_id,
+      plano_id: pre.plano_id || s.plano_id,
       origem: pre.origem || s.origem,
       data_prevista: pre.vencimento || s.data_prevista,
+      prioridade: (pre.prioridade || s.prioridade) as "baixa" | "media" | "alta" | "urgente",
+      tipo_manutencao: (pre.origem === "plan" ? "preventiva" : s.tipo_manutencao) as "preventiva" | "corretiva" | "preditiva",
     }));
   }, [pre]);
 

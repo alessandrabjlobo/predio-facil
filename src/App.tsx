@@ -37,6 +37,7 @@ import MaintenanceTemplates from "@/pages/admin/MaintenanceTemplates";
 import AssetLibrary from "@/pages/admin/AssetLibrary";
 import Condominios from "@/pages/Condominios";
 import ConfiguracoesSindico from "@/pages/ConfiguracoesSindico";
+import OSNovo from "@/pages/OSNovo";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -147,6 +148,7 @@ export default function App() {
                 <Route path="ativos/:id" element={<AtivoDetalhe />} />
                 <Route path="ativos" element={<Ativos />} />
                 <Route path="os" element={<OS />} />
+                <Route path="os/new" element={<OSNovo />} />
                 <Route path="conformidade" element={<Conformidade />} />
                 <Route path="preventivas" element={<Preventivas />} />
                 <Route path="manutencoes" element={<Manutencoes />} />
