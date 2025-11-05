@@ -16,6 +16,7 @@ import {
   AtivoTipoRow,
   deleteAtivoAndRelated,
   listManutencaoAnexos,
+  gerarPlanosPreventivos, // ✅ novo import
 } from "@/lib/api";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -53,6 +54,8 @@ import {
   Wrench,
   ClipboardList,
 } from "lucide-react";
+
+import { useCondominioAtual } from "@/hooks/useCondominioAtual"; // ✅ novo import
 
 /* ---------------- helpers ---------------- */
 type Ativo = {
@@ -123,6 +126,10 @@ export default function AtivosPage() {
   const [manuts, setManuts] = useState<Manutencao[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
+  // condominio atual (para o RPC)
+  const { condominio } = useCondominioAtual(); // ✅ assume que já existe no seu projeto
+  const [generatingPlans, setGeneratingPlans] = useState(false); // ✅ estado do botão
+
   // deep-link
   const [params] = useSearchParams();
   const deepAtivoId = params.get("ativo");
@@ -169,7 +176,7 @@ export default function AtivosPage() {
   function isConformidadeTipo(nome: string | undefined | null) {
     if (!nome) return false;
     const keySlug = slugify(nome);
-    const keyLower = nome.toLowerCase();
+    const keyLower = (nome || "").toLowerCase();
     const row = tiposMap.get(keySlug) || tiposMap.get(keyLower);
     return !!row?.is_conformidade;
   }
@@ -247,6 +254,29 @@ export default function AtivosPage() {
     }
   }
 
+  // ✅ Botão "Gerar Planos Preventivos" (RPC)
+  async function handleGenerateAllPlans() {
+    if (!condominio?.id) {
+      window.alert("Condomínio não selecionado.");
+      return;
+    }
+    const confirmed = window.confirm(
+      "Gerar planos preventivos para todos os ativos deste condomínio que ainda não possuem planos?"
+    );
+    if (!confirmed) return;
+
+    setGeneratingPlans(true);
+    try {
+      await gerarPlanosPreventivos(condominio.id);
+      window.alert("Planos preventivos gerados com sucesso.");
+      await refreshAtivos();
+    } catch (error: any) {
+      window.alert(error?.message || "Erro ao gerar planos preventivos.");
+    } finally {
+      setGeneratingPlans(false);
+    }
+  }
+
   return (
     <div className="p-6 grid gap-6">
       <div className="flex items-center justify-between">
@@ -254,14 +284,25 @@ export default function AtivosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Ativos</h1>
           <p className="text-gray-600">Cadastre os equipamentos/instalações e acompanhe planos e histórico.</p>
         </div>
-        <Button
-          onClick={() => {
-            setEdit(null);
-            setOpenUpsert(true);
-          }}
-        >
-          Novo ativo
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleGenerateAllPlans}
+            disabled={generatingPlans}
+            title="Gera planos preventivos com base no tipo do ativo e periodicidade padrão"
+          >
+            <Wrench className="h-4 w-4 mr-2" />
+            {generatingPlans ? "Gerando..." : "Gerar Planos Preventivos"}
+          </Button>
+          <Button
+            onClick={() => {
+              setEdit(null);
+              setOpenUpsert(true);
+            }}
+          >
+            Novo ativo
+          </Button>
+        </div>
       </div>
 
       {/* Filtro */}
@@ -579,7 +620,7 @@ function AtivoDetailsDialog({
 }) {
   const navigate = useNavigate();
 
-  // 👉 Agora ABRE o formulário /os/novo com sugestões via query string
+  // 👉 Abre form /os/novo com sugestões via query string
   function criarOSParaAtivo() {
     if (!ativo) return;
     const params = new URLSearchParams({
