@@ -16,7 +16,7 @@ import {
   AtivoTipoRow,
   deleteAtivoAndRelated,
   listManutencaoAnexos,
-  gerarPlanosPreventivos, // ✅ novo import
+  gerarPlanosPreventivos, // ✅ RPC para gerar planos
 } from "@/lib/api";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -220,10 +220,10 @@ export default function AtivosPage() {
 
   async function openDetailsFor(ativo: Ativo) {
     setCurrent(ativo);
-    try {
-      await ensureDefaultPlanoParaAtivo({ id: ativo.id, tipo: ativo.tipo });
-    } catch {}
-    const [p, m] = await Promise.all([listPlanosByAtivo(ativo.id), listManutencoesByAtivo(ativo.id)]);
+    const [p, m] = await Promise.all([
+      listPlanosByAtivo(ativo.id),
+      listManutencoesByAtivo(ativo.id),
+    ]);
     setPlanos(p);
     setManuts(m);
     setOpenDetails(true);

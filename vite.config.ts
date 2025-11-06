@@ -3,19 +3,16 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// ✅ Detecta corretamente as envs no ambiente Vite/Lovable
-const envUrl =
-  process.env.VITE_SUPABASE_URL || process?.env?.SUPABASE_URL;
-const envKey =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  process?.env?.SUPABASE_KEY;
+// ✅ Strictly use Vite envs (no fallbacks)
+const envUrl = process.env.VITE_SUPABASE_URL;
+const envKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 const hasSupabaseEnv = !!envUrl && !!envKey;
 
 console.log("✅ ENV CHECK (vite.config.ts):", {
   hasSupabaseEnv,
   envUrl,
-  envKeyPresent: !!envKey,
+  anonKeyPresent: !!envKey,
 });
 
 // https://vitejs.dev/config/
