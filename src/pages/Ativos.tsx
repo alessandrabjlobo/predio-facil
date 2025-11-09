@@ -254,24 +254,28 @@ export default function AtivosPage() {
     }
   }
 
-  // ✅ Botão "Gerar Planos Preventivos" (RPC)
+  // ✅ Botão "Gerar Planos Preventivos" (RPC) - com comportamento defensivo
   async function handleGenerateAllPlans() {
     if (!condominio?.id) {
-      window.alert("Condomínio não selecionado.");
+      window.alert("⚠️ Condomínio não selecionado. Selecione um condomínio antes de gerar planos.");
       return;
     }
+    
     const confirmed = window.confirm(
-      "Gerar planos preventivos para todos os ativos deste condomínio que ainda não possuem planos?"
+      "Gerar planos preventivos para todos os ativos deste condomínio que ainda não possuem planos?\n\n" +
+      "Isso criará planos de manutenção baseados nos tipos de ativos e suas periodicidades padrão."
     );
     if (!confirmed) return;
 
     setGeneratingPlans(true);
     try {
       await gerarPlanosPreventivos(condominio.id);
-      window.alert("Planos preventivos gerados com sucesso.");
+      window.alert("✅ Planos preventivos gerados com sucesso!");
       await refreshAtivos();
     } catch (error: any) {
-      window.alert(error?.message || "Erro ao gerar planos preventivos.");
+      console.error("❌ Erro ao gerar planos:", error);
+      const msg = error?.message || "Erro desconhecido ao gerar planos preventivos";
+      window.alert(`❌ ${msg}`);
     } finally {
       setGeneratingPlans(false);
     }

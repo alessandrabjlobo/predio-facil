@@ -1101,14 +1101,32 @@ export async function getOS(id: string) {
   } as OSRow;
 }
 
+/**
+ * Gera planos preventivos usando a RPC do banco de dados.
+ * Comportamento defensivo: se o RPC não existir, retorna erro descritivo.
+ */
 export async function gerarPlanosPreventivos(condominioId: string): Promise<boolean> {
-  const { error } = await supabase.rpc("criar_planos_preventivos", {
+  if (!condominioId) {
+    throw new Error("ID do condomínio é obrigatório para gerar planos preventivos");
+  }
+
+  const { data, error } = await supabase.rpc("criar_planos_preventivos", {
     p_condominio_id: condominioId,
   });
 
   if (error) {
+    // Erro defensivo: se RPC não existe
+    if (error.message?.includes("function") && error.message?.includes("does not exist")) {
+      console.warn("⚠️ RPC criar_planos_preventivos não encontrado no banco de dados");
+      throw new Error(
+        "A função de geração de planos não está disponível. " +
+        "Contate o administrador para executar a migração SQL necessária."
+      );
+    }
     throw error;
   }
+
+  console.log("✅ Planos preventivos gerados:", data);
   return true;
 }
 

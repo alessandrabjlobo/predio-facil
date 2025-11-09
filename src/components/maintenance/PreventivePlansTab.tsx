@@ -140,19 +140,29 @@ export function PreventivePlansTab() {
 
   const handleGeneratePlans = async () => {
     if (!condominio?.id) {
-      toast({ variant: "destructive", title: "Condomínio não definido", description: "Selecione um condomínio para gerar os planos." });
+      toast({ 
+        variant: "destructive", 
+        title: "Condomínio não definido", 
+        description: "Selecione um condomínio para gerar os planos." 
+      });
       return;
     }
+    
     try {
       setGenLoading(true);
       await gerarPlanosPreventivos(condominio.id);
-      toast({ title: "Planos preventivos gerados com sucesso." });
+      toast({ 
+        title: "✅ Sucesso", 
+        description: "Planos preventivos gerados com sucesso." 
+      });
+      
       if (typeof refetch === "function") {
         await refetch();
       } else {
         toast({ description: "Atualize a página para ver os novos planos." });
       }
     } catch (e: any) {
+      console.error("❌ Erro ao gerar planos:", e);
       toast({
         variant: "destructive",
         title: "Falha ao gerar planos",
