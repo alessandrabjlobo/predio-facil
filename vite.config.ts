@@ -43,6 +43,12 @@ export default defineConfig(({ mode }) => {
       // Support NEXT_PUBLIC_* envs as requested
       "import.meta.env.NEXT_PUBLIC_SUPABASE_URL": JSON.stringify(env.NEXT_PUBLIC_SUPABASE_URL),
       "import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY": JSON.stringify(env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      // Ensure project id and publishable key are exposed to the client
+      "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify(env.VITE_SUPABASE_PROJECT_ID),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(env.VITE_SUPABASE_PUBLISHABLE_KEY),
+      // Fallback to SUPABASE_* if present in environment
+      "import.meta.env.SUPABASE_URL": JSON.stringify(env.SUPABASE_URL),
+      "import.meta.env.SUPABASE_ANON_KEY": JSON.stringify(env.SUPABASE_ANON_KEY),
     },
   };
 });

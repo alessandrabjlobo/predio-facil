@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const url = (
   import.meta.env.NEXT_PUBLIC_SUPABASE_URL ??
   import.meta.env.VITE_SUPABASE_URL ??
+  import.meta.env.SUPABASE_URL ??
   (import.meta.env.VITE_SUPABASE_PROJECT_ID
     ? `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`
     : undefined)
@@ -10,6 +11,7 @@ const url = (
 const anon = (
   import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  import.meta.env.SUPABASE_ANON_KEY ??
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 )?.toString();
 
@@ -20,9 +22,11 @@ if (!url || !anon) {
       '❌ Backend não configurado (Supabase).',
       `NEXT_PUBLIC_SUPABASE_URL: ${import.meta.env.NEXT_PUBLIC_SUPABASE_URL ?? '(undefined)'}`,
       `VITE_SUPABASE_URL: ${import.meta.env.VITE_SUPABASE_URL ?? '(undefined)'}`,
+      `SUPABASE_URL: ${import.meta.env.SUPABASE_URL ?? '(undefined)'}`,
       `VITE_SUPABASE_PROJECT_ID: ${import.meta.env.VITE_SUPABASE_PROJECT_ID ?? '(undefined)'}`,
       `NEXT_PUBLIC_SUPABASE_ANON_KEY: ${import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '(present)' : '(undefined)'}`,
       `VITE_SUPABASE_ANON_KEY: ${import.meta.env.VITE_SUPABASE_ANON_KEY ? '(present)' : '(undefined)'}`,
+      `SUPABASE_ANON_KEY: ${import.meta.env.SUPABASE_ANON_KEY ? '(present)' : '(undefined)'}`,
       `VITE_SUPABASE_PUBLISHABLE_KEY: ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ? '(present)' : '(undefined)'}`,
       'Defina as envs públicas no painel (Settings → Environment) e redeploy.',
     ].join('\n')
