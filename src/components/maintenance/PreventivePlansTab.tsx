@@ -20,6 +20,8 @@ import { useNavigate } from "react-router-dom";
 import { useCondominioAtual } from "@/hooks/useCondominioAtual";
 import { gerarPlanosPreventivos } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { getCurrentCondominioId } from "@/lib/tenant";
+import { supabase } from "@/integrations/supabase/client";
 
 export function PreventivePlansTab() {
   const { planos, isLoading, refetch } = usePlanosManutencao() as any;
@@ -39,17 +41,73 @@ export function PreventivePlansTab() {
     localStorage.setItem("maintenance_plans_view", viewMode);
   }, [viewMode]);
 
-  // Geração automática (uma vez) se não houver planos e existir condomínio atual
-  useEffect(() => {
-    const shouldAutoGenerate =
-      !isLoading && !autoRan && (planos?.length ?? 0) === 0 && condominio?.id;
-    if (!shouldAutoGenerate) return;
+  // Resolve condominio.id usando múltiplas fontes, com fallbacks
+  async function resolveCondominioId(): Promise<string | null> {
+    try {
+      if (condominio?.id) return condominio.id;
 
-    setAutoRan(true);
+      const saved = getCurrentCondominioId();
+      if (saved) return saved;
+
+      // Fallback: se o usuário pertence a exatamente 1 condomínio, usa esse
+      const { data: auth } = await supabase.auth.getUser();
+      const authId = auth?.user?.id;
+      if (!authId) return null;
+
+      const { data: usuario, error: eUsuario } = await supabase
+        .from("usuarios")
+        .select("id")
+        .eq("auth_user_id", authId)
+        .maybeSingle();
+      if (eUsuario || !usuario?.id) return null;
+
+      const { data: rels, error: eRels } = await supabase
+        .from("usuarios_condominios")
+        .select("condominio_id")
+        .eq("usuario_id", usuario.id);
+      if (eRels) return null;
+
+      const ids = (rels ?? []).map((r: any) => r.condominio_id).filter(Boolean);
+      const unique = Array.from(new Set(ids));
+      if (unique.length === 1) {
+        return unique[0] as string;
+      }
+      if (unique.length > 1) {
+        toast({
+          title: "Selecione um condomínio",
+          description:
+            "Você tem acesso a vários condomínios. Use o seletor no topo para escolher.",
+        });
+        return null;
+      }
+      return null;
+    } catch (e) {
+      console.error("resolveCondominioId erro:", e);
+      return null;
+    }
+  }
+
+  // Log de diagnóstico
+  useEffect(() => {
     (async () => {
+      const id = await resolveCondominioId();
+      console.info("Condominio in PlansTab:", id || "(none)");
+    })();
+  }, [condominio?.id]);
+
+  // Geração automática (uma vez) se não houver planos
+  useEffect(() => {
+    (async () => {
+      const shouldAutoGenerate = !isLoading && !autoRan && (planos?.length ?? 0) === 0;
+      if (!shouldAutoGenerate) return;
+
+      setAutoRan(true);
+      const resolvedId = await resolveCondominioId();
+      if (!resolvedId) return;
+
       try {
         setGenLoading(true);
-        await gerarPlanosPreventivos(condominio!.id);
+        await gerarPlanosPreventivos(resolvedId);
         toast({ title: "Planos gerados automaticamente." });
         if (typeof refetch === "function") await refetch();
       } catch (e: any) {
@@ -59,7 +117,7 @@ export function PreventivePlansTab() {
         setGenLoading(false);
       }
     })();
-  }, [isLoading, autoRan, planos, condominio, refetch]);
+  }, [isLoading, autoRan, planos, condominio?.id, refetch]);
 
   const getPeriodicidadeLabel = (periodicidade: any) => {
     if (!periodicidade) return "N/A";
@@ -139,23 +197,28 @@ export function PreventivePlansTab() {
   };
 
   const handleGeneratePlans = async () => {
-    if (!condominio?.id) {
-      toast({ 
-        variant: "destructive", 
-        title: "Condomínio não definido", 
-        description: "Selecione um condomínio para gerar os planos." 
+    const resolvedId = await resolveCondominioId();
+    if (!resolvedId) {
+      toast({
+        variant: "destructive",
+        title: "Condomínio não definido",
+        description: "Selecione um condomínio para gerar os planos.",
       });
+      console.warn("handleGeneratePlans: no condominium id resolved");
       return;
     }
-    
+
+    console.info("handleGeneratePlans using condominio_id:", resolvedId);
+
     try {
       setGenLoading(true);
-      await gerarPlanosPreventivos(condominio.id);
-      toast({ 
-        title: "✅ Sucesso", 
-        description: "Planos preventivos gerados com sucesso." 
+      toast({ description: `Gerando planos para condomínio ${resolvedId}...` });
+      await gerarPlanosPreventivos(resolvedId);
+      toast({
+        title: "✅ Sucesso",
+        description: "Planos preventivos gerados com sucesso.",
       });
-      
+
       if (typeof refetch === "function") {
         await refetch();
       } else {
