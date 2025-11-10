@@ -1,7 +1,7 @@
 // FILE: src/components/os/OSKanban.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { listOS, setOSStatus, type OSRow, type OSStatus } from "@/lib/api";
+import { listOS, setOSStatus, osDbEncodeStatus, type OSRow, type OSStatus } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Loader2, RefreshCw } from "lucide-react";
@@ -79,6 +79,9 @@ export default function OSKanban() {
     setItems(prev => prev.map(i => i.id === osId ? { ...i, status: newStatus } : i));
     setSavingId(osId);
     try {
+      // Encode status to prevent CHECK constraint violations
+      const encodedStatus = osDbEncodeStatus(newStatus);
+      console.log(`[OSKanban] Updating OS ${osId}: "${newStatus}" -> DB: "${encodedStatus}"`);
       await setOSStatus(osId, newStatus);
     } catch (err: any) {
       // rollback

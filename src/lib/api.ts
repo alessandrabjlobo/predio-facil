@@ -120,10 +120,14 @@ function osNormalizeStatus(s?: string | null): OSStatus {
   return "aberta";
 }
 
-/** 🚨 encode para o DB (usa UNDERSCORE onde o CHECK exige) */
-function osDbEncodeStatus(s: OSStatus | string): string {
+/** 
+ * 🚨 Encode OS status for database (uses correct format to prevent CHECK violations)
+ * DB expects: "aberta", "em andamento" (with SPACE), "aguardando_validacao", "concluida", "cancelada"
+ */
+export function osDbEncodeStatus(s: OSStatus | string): string {
   const k = (s ?? "aberta").toString().toLowerCase().trim();
-  if (k === "em andamento" || k === "em_andamento") return "em_andamento";
+  // Convert underscore variant to space variant for "em andamento"
+  if (k === "em andamento" || k === "em_andamento") return "em andamento";
   if (k === "aguardando validacao" || k === "aguardando_validacao") return "aguardando_validacao";
   // "aberta", "concluida", "cancelada" já estão no formato esperado
   return k;
