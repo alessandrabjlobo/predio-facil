@@ -227,32 +227,81 @@ export function PreventivePlansTab() {
 
     try {
       setGenLoading(true);
-      toast({ description: `Gerando planos para condomínio ${resolvedId}...` });
       
-      // Chamada direta ao RPC
+      // Direct RPC call using singleton client
       const { error: rpcError } = await supabase.rpc("criar_planos_preventivos", {
         p_condominio_id: resolvedId,
       });
 
       if (rpcError) {
         console.error("❌ RPC Error:", rpcError);
-        throw rpcError;
+        
+        // Check if function doesn't exist
+        if (rpcError.code === '42883' || rpcError.message?.includes('function')) {
+          toast({
+            title: "Função não encontrada",
+            description: "Database function not found. Check console for SQL.",
+            variant: "destructive",
+          });
+          console.error(`
+📋 SQL NEEDED - Paste in Supabase SQL Editor:
+
+CREATE OR REPLACE FUNCTION public.criar_planos_preventivos(p_condominio_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+DECLARE v_ativo RECORD; v_nbr RECORD; v_plano_id UUID;
+BEGIN
+  FOR v_ativo IN 
+    SELECT id, tipo_id, nome FROM ativos
+    WHERE condominio_id = p_condominio_id AND requer_conformidade = true AND is_ativo = true
+  LOOP
+    FOR v_nbr IN
+      SELECT * FROM nbr_requisitos nr JOIN ativo_tipos at ON at.slug = nr.ativo_tipo_slug
+      WHERE at.id = v_ativo.tipo_id
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1 FROM planos_manutencao WHERE ativo_id = v_ativo.id
+          AND titulo = v_nbr.nbr_codigo || ': ' || v_nbr.requisito_descricao
+      ) THEN
+        INSERT INTO planos_manutencao (condominio_id, ativo_id, titulo, tipo, periodicidade,
+          proxima_execucao, is_legal, checklist, responsavel)
+        VALUES (p_condominio_id, v_ativo.id, v_nbr.nbr_codigo || ': ' || v_nbr.requisito_descricao,
+          'preventiva', v_nbr.periodicidade_minima, CURRENT_DATE + v_nbr.periodicidade_minima,
+          true, v_nbr.checklist_items, COALESCE(v_nbr.responsavel_sugerido, 'sindico'))
+        RETURNING id INTO v_plano_id;
+        
+        INSERT INTO conformidade_itens (condominio_id, ativo_id, plano_id, tipo, periodicidade, proximo, status)
+        VALUES (p_condominio_id, v_ativo.id, v_plano_id, 'preventiva', v_nbr.periodicidade_minima,
+          CURRENT_DATE + v_nbr.periodicidade_minima, 'amarelo');
+      END IF;
+    END LOOP;
+  END LOOP;
+END;
+$function$;
+          `);
+        } else {
+          toast({
+            title: "Erro no RPC",
+            description: rpcError.message || "Falha ao gerar planos",
+            variant: "destructive",
+          });
+        }
+        return;
       }
 
-      console.info("✅ RPC sucesso - planos criados");
+      console.info("✅ RPC success - plans created");
       toast({
         title: "✅ Sucesso",
         description: "Planos preventivos gerados com sucesso.",
       });
-
-      // Atualiza a lista
+      
       await refetch();
     } catch (e: any) {
-      console.error("❌ Erro ao gerar planos:", e);
+      console.error("❌ Exception in handleGeneratePlans:", e);
       toast({
         variant: "destructive",
-        title: "Falha ao gerar planos",
-        description: e?.message ?? "Erro inesperado ao chamar o RPC",
+        title: "Erro",
+        description: e?.message ?? "Erro inesperado",
       });
     } finally {
       setGenLoading(false);

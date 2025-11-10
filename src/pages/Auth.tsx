@@ -22,20 +22,32 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    if (import.meta.env.DEV) {
+      console.log('🔐 Login attempt - using URL:', import.meta.env.VITE_SUPABASE_URL);
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: loginPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        // User-friendly message for 401/invalid credentials
+        if (error.status === 401 || error.message.includes('Invalid')) {
+          toast.error("Email ou senha inválidos");
+        } else {
+          toast.error(error.message || "Erro ao fazer login");
+        }
+        return;
+      }
 
       if (data.session) {
         toast.success("Login realizado com sucesso!");
         navigate("/");
       }
     } catch (error: any) {
-      toast.error(error.message || "Erro ao fazer login");
+      toast.error("Erro ao fazer login. Tente novamente.");
     } finally {
       setIsLoading(false);
     }
