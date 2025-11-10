@@ -24,9 +24,15 @@ import { getCurrentCondominioId } from "@/lib/tenant";
 import { supabase } from "@/integrations/supabase/client";
 
 export function PreventivePlansTab() {
-  const { planos, isLoading, refetch } = usePlanosManutencao() as any;
+  const { planos, isLoading, refetch } = usePlanosManutencao();
   const navigate = useNavigate();
   const { condominio } = useCondominioAtual();
+
+  // Diagnóstico: Log do condomínio atual logo no início
+  useEffect(() => {
+    console.info("🏢 PreventivePlansTab - Context condominio.id:", condominio?.id || "(null)");
+    console.info("🏢 PreventivePlansTab - Saved in localStorage:", getCurrentCondominioId() || "(null)");
+  }, [condominio?.id]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [genLoading, setGenLoading] = useState(false);
@@ -44,10 +50,16 @@ export function PreventivePlansTab() {
   // Resolve condominio.id usando múltiplas fontes, com fallbacks
   async function resolveCondominioId(): Promise<string | null> {
     try {
-      if (condominio?.id) return condominio.id;
+      if (condominio?.id) {
+        console.info("✅ resolveCondominioId: using context:", condominio.id);
+        return condominio.id;
+      }
 
       const saved = getCurrentCondominioId();
-      if (saved) return saved;
+      if (saved) {
+        console.info("✅ resolveCondominioId: using localStorage:", saved);
+        return saved;
+      }
 
       // Fallback: se o usuário pertence a exatamente 1 condomínio, usa esse
       const { data: auth } = await supabase.auth.getUser();
@@ -70,9 +82,11 @@ export function PreventivePlansTab() {
       const ids = (rels ?? []).map((r: any) => r.condominio_id).filter(Boolean);
       const unique = Array.from(new Set(ids));
       if (unique.length === 1) {
+        console.info("✅ resolveCondominioId: single condo fallback:", unique[0]);
         return unique[0] as string;
       }
       if (unique.length > 1) {
+        console.warn("⚠️ resolveCondominioId: multiple condos found, user must select");
         toast({
           title: "Selecione um condomínio",
           description:
@@ -80,18 +94,19 @@ export function PreventivePlansTab() {
         });
         return null;
       }
+      console.warn("⚠️ resolveCondominioId: no condominiums found for user");
       return null;
     } catch (e) {
-      console.error("resolveCondominioId erro:", e);
+      console.error("❌ resolveCondominioId erro:", e);
       return null;
     }
   }
 
-  // Log de diagnóstico
+  // Log de diagnóstico final
   useEffect(() => {
     (async () => {
       const id = await resolveCondominioId();
-      console.info("Condominio in PlansTab:", id || "(none)");
+      console.info("🎯 Condominio in PlansTab (resolved):", id || "(none)");
     })();
   }, [condominio?.id]);
 
@@ -204,32 +219,40 @@ export function PreventivePlansTab() {
         title: "Condomínio não definido",
         description: "Selecione um condomínio para gerar os planos.",
       });
-      console.warn("handleGeneratePlans: no condominium id resolved");
+      console.warn("⚠️ handleGeneratePlans: no condominium id resolved");
       return;
     }
 
-    console.info("handleGeneratePlans using condominio_id:", resolvedId);
+    console.info("🚀 handleGeneratePlans: calling RPC with condominio_id:", resolvedId);
 
     try {
       setGenLoading(true);
       toast({ description: `Gerando planos para condomínio ${resolvedId}...` });
-      await gerarPlanosPreventivos(resolvedId);
+      
+      // Chamada direta ao RPC
+      const { error: rpcError } = await supabase.rpc("criar_planos_preventivos", {
+        p_condominio_id: resolvedId,
+      });
+
+      if (rpcError) {
+        console.error("❌ RPC Error:", rpcError);
+        throw rpcError;
+      }
+
+      console.info("✅ RPC sucesso - planos criados");
       toast({
         title: "✅ Sucesso",
         description: "Planos preventivos gerados com sucesso.",
       });
 
-      if (typeof refetch === "function") {
-        await refetch();
-      } else {
-        toast({ description: "Atualize a página para ver os novos planos." });
-      }
+      // Atualiza a lista
+      await refetch();
     } catch (e: any) {
       console.error("❌ Erro ao gerar planos:", e);
       toast({
         variant: "destructive",
         title: "Falha ao gerar planos",
-        description: e?.message ?? "Erro inesperado",
+        description: e?.message ?? "Erro inesperado ao chamar o RPC",
       });
     } finally {
       setGenLoading(false);

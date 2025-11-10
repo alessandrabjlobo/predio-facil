@@ -7,7 +7,7 @@ export const usePlanosManutencao = () => {
   const { condominio } = useCondominioAtual();
   const queryClient = useQueryClient();
 
-  const { data: planos, isLoading } = useQuery({
+  const { data: planos, isLoading, refetch } = useQuery({
     queryKey: ["planos-manutencao", condominio?.id],
     queryFn: async () => {
       if (!condominio?.id) return [];
@@ -73,5 +73,5 @@ export const usePlanosManutencao = () => {
     },
   });
 
-  return { planos, isLoading, createPlano };
+  return { planos, isLoading, refetch, createPlano };
 };
